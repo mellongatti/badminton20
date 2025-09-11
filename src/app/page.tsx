@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import PlayerForm from '@/components/PlayerForm'
 import PlayerList from '@/components/PlayerList'
