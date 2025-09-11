@@ -37,6 +37,93 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPlayer, setFilterPlayer] = useState('')
 
+  const deleteGame = async (gameId: number) => {
+    if (!confirm('Tem certeza que deseja excluir este jogo?')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('games')
+        .delete()
+        .eq('id', gameId)
+
+      if (error) {
+        console.error('Erro ao excluir jogo:', error)
+        alert('Erro ao excluir jogo')
+      } else {
+        onGamesUpdated()
+        alert('Jogo excluído com sucesso!')
+      }
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao excluir jogo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeDuplicateGames = async () => {
+    if (!confirm('Deseja remover todos os jogos duplicados? Esta ação não pode ser desfeita.')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Buscar todos os jogos
+      const { data: allGames } = await supabase
+        .from('games')
+        .select('*')
+        .order('id')
+
+      if (!allGames) {
+        setLoading(false)
+        return
+      }
+
+      // Identificar duplicatas
+      const seenCombinations = new Set()
+      const duplicateIds = []
+
+      allGames.forEach(game => {
+        const combination1 = `${game.player1_id}-${game.player2_id}-${game.category_id}`
+        const combination2 = `${game.player2_id}-${game.player1_id}-${game.category_id}`
+        
+        if (seenCombinations.has(combination1) || seenCombinations.has(combination2)) {
+          duplicateIds.push(game.id)
+        } else {
+          seenCombinations.add(combination1)
+        }
+      })
+
+      if (duplicateIds.length === 0) {
+        alert('Nenhum jogo duplicado encontrado!')
+        setLoading(false)
+        return
+      }
+
+      // Remover duplicatas
+      const { error } = await supabase
+        .from('games')
+        .delete()
+        .in('id', duplicateIds)
+
+      if (error) {
+        console.error('Erro ao remover duplicatas:', error)
+        alert('Erro ao remover jogos duplicados')
+      } else {
+        onGamesUpdated()
+        alert(`${duplicateIds.length} jogo(s) duplicado(s) removido(s) com sucesso!`)
+      }
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao remover jogos duplicados')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const generateGames = async () => {
     if (!selectedCategory) {
       alert('Selecione uma categoria')
@@ -181,7 +268,7 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
       {/* Gerador de Jogos */}
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="text-lg font-semibold mb-4 text-blue-800">Gerar Jogos por Categoria</h3>
-        <div className="flex gap-4 items-end">
+        <div className="flex gap-4 items-end mb-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-black mb-1">
               Categoria
@@ -206,6 +293,21 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
           >
             {loading ? 'Gerando...' : 'Gerar Jogos'}
           </button>
+        </div>
+        <div className="border-t border-blue-200 pt-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-1">Manutenção de Jogos</h4>
+              <p className="text-xs text-gray-600">Remover jogos duplicados do sistema</p>
+            </div>
+            <button
+              onClick={removeDuplicateGames}
+              disabled={loading}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 text-sm"
+            >
+              {loading ? 'Removendo...' : '🗑️ Remover Duplicatas'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -311,6 +413,7 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
                     game={game}
                     onUpdateResult={updateGameResult}
                     onUpdateDate={updateGameDate}
+                    onDeleteGame={deleteGame}
                     loading={loading}
                   />
                 </div>
@@ -327,10 +430,11 @@ interface GameCardProps {
   game: Game
   onUpdateResult: (gameId: number, sets: any, winnerId: number) => void
   onUpdateDate: (gameId: number, date: string) => void
+  onDeleteGame: (gameId: number) => void
   loading: boolean
 }
 
-function GameCard({ game, onUpdateResult, onUpdateDate, loading }: GameCardProps) {
+function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }: GameCardProps) {
   const [isEditing, setIsEditing] = useState(!game.winner_id)
   const [gameDate, setGameDate] = useState(game.game_date || '')
   
@@ -548,14 +652,24 @@ function GameCard({ game, onUpdateResult, onUpdateDate, loading }: GameCardProps
             )}
           </>
         ) : (
-          <button
-            onClick={handleEdit}
-            disabled={loading}
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg font-medium"
-          >
-            <span>✏️</span>
-            Editar Resultado
-          </button>
+          <>
+            <button
+              onClick={handleEdit}
+              disabled={loading}
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg font-medium"
+            >
+              <span>✏️</span>
+              Editar Resultado
+            </button>
+            <button
+              onClick={() => onDeleteGame(game.id)}
+              disabled={loading}
+              className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg font-medium"
+            >
+              <span>🗑️</span>
+              Excluir
+            </button>
+          </>
         )}
       </div>
       
