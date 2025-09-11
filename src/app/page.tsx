@@ -8,8 +8,10 @@ import CategoryForm from '@/components/CategoryForm'
 import CategoryList from '@/components/CategoryList'
 import GamesList from '@/components/GamesList'
 import Standings from '@/components/Standings'
+import Login from '@/components/Login'
 
 export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState('players')
   const [players, setPlayers] = useState([])
   const [categories, setCategories] = useState([])
@@ -54,11 +56,34 @@ export default function Home() {
     }
   }
 
+  const handleLogin = (success: boolean) => {
+    if (success) {
+      setIsAuthenticated(true)
+      // Carregar dados após login bem-sucedido
+      fetchCategories()
+      fetchPlayers()
+      fetchGames()
+    }
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setActiveTab('players')
+  }
+
   useEffect(() => {
-    fetchCategories()
-    fetchPlayers()
-    fetchGames()
-  }, [])
+    // Só carregar dados se estiver autenticado
+    if (isAuthenticated) {
+      fetchCategories()
+      fetchPlayers()
+      fetchGames()
+    }
+  }, [isAuthenticated])
+
+  // Se não estiver autenticado, mostrar tela de login
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />
+  }
 
   const tabs = [
     { id: 'players', name: 'Jogadores', icon: '👤' },
@@ -70,6 +95,24 @@ export default function Home() {
 
   return (
     <div className="px-4 py-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">🏸</span>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Campeonato de Badminton</h1>
+            <p className="text-sm text-gray-600">Sistema de Gerenciamento</p>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+        >
+          <span>🚪</span>
+          Sair
+        </button>
+      </div>
+
       {/* Navigation Tabs */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="-mb-px flex space-x-8">
