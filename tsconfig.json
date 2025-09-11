@@ -8,6 +8,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
