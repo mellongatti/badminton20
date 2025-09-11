@@ -48,7 +48,7 @@ export default function PlayerForm({ categories, onPlayerAdded }: PlayerFormProp
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="name" className="block text-sm font-medium text-blue-800 mb-1">
           Nome do Jogador
         </label>
         <input
@@ -63,7 +63,7 @@ export default function PlayerForm({ categories, onPlayerAdded }: PlayerFormProp
       </div>
 
       <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="category" className="block text-sm font-medium text-blue-800 mb-1">
           Categoria
         </label>
         <select
@@ -85,7 +85,7 @@ export default function PlayerForm({ categories, onPlayerAdded }: PlayerFormProp
       <button
         type="submit"
         disabled={loading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all"
       >
         {loading ? 'Cadastrando...' : 'Cadastrar Jogador'}
       </button>

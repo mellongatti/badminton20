@@ -130,48 +130,48 @@ export default function Standings({ games, players, categories }: StandingsProps
         
         if (standings.length === 0) {
           return (
-            <div key={category.id} className="bg-gray-50 p-6 rounded-lg">
-              <h3 className="text-xl font-bold mb-4">{category.name}</h3>
-              <p className="text-gray-500">Nenhum jogo finalizado nesta categoria ainda.</p>
+            <div key={category.id} className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm">
+              <h3 className="text-xl font-bold mb-4 text-blue-800">{category.name}</h3>
+              <p className="text-black">Nenhum jogo finalizado nesta categoria ainda.</p>
             </div>
           )
         }
 
         return (
-          <div key={category.id} className="bg-white border rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b">
-              <h3 className="text-xl font-bold">{category.name}</h3>
+          <div key={category.id} className="bg-white border rounded-xl overflow-hidden shadow-lg border-blue-100">
+            <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
+              <h3 className="text-xl font-bold text-blue-800">{category.name}</h3>
             </div>
             
             <div className="overflow-x-auto">
               <table className="min-w-full">
-                <thead className="bg-gray-100">
+                <thead className="bg-blue-100">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Posição
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Jogador
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Jogos
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Vitórias
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Derrotas
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      % Vitórias
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
+                      Sets Ganhos
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pontos Pró
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
+                      Sets Perdidos
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pontos Contra
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
+                      Pontos
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Saldo
                     </th>
                   </tr>
@@ -185,7 +185,7 @@ export default function Standings({ games, players, categories }: StandingsProps
                       <tr key={stats.playerId} className={isChampion ? 'bg-yellow-50' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className={`text-sm font-medium ${
-                            isChampion ? 'text-yellow-600' : 'text-gray-900'
+                            isChampion ? 'text-yellow-600' : 'text-black'
                           }`}>
                             {index + 1}º
                             {isChampion && ' 🏆'}
@@ -193,33 +193,31 @@ export default function Standings({ games, players, categories }: StandingsProps
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className={`text-sm font-medium ${
-                            isChampion ? 'text-yellow-600' : 'text-gray-900'
+                            isChampion ? 'text-yellow-600' : 'text-black'
                           }`}>
                             {stats.playerName}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
                           {stats.gamesPlayed}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-green-600 font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
                           {stats.wins}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-red-600 font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
                           {stats.losses}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black font-medium">
                           {stats.winPercentage.toFixed(1)}%
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
                           {stats.pointsFor}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
                           {stats.pointsAgainst}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                          <span className={saldo >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            {saldo >= 0 ? '+' : ''}{saldo}
-                          </span>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
+                          {saldo >= 0 ? '+' : ''}{saldo}
                         </td>
                       </tr>
                     )
@@ -232,7 +230,7 @@ export default function Standings({ games, players, categories }: StandingsProps
       })}
       
       {categories.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-black">
           Nenhuma categoria cadastrada ainda.
         </div>
       )}

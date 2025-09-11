@@ -46,6 +46,7 @@ export default function Home() {
         player2:players!games_player2_id_fkey(name),
         category:categories(name)
       `)
+      .order('created_at', { ascending: false })
     if (error) {
       console.error('Erro ao buscar jogos:', error)
     } else {
@@ -78,7 +79,7 @@ export default function Home() {
               className={`${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-black hover:text-gray-700 hover:border-gray-300'
               } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
             >
               <span>{tab.icon}</span>
@@ -91,15 +92,15 @@ export default function Home() {
       {/* Tab Content */}
       {activeTab === 'players' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Cadastrar Jogador</h2>
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Cadastrar Jogador</h2>
             <PlayerForm 
               categories={categories} 
               onPlayerAdded={fetchPlayers}
             />
           </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Lista de Jogadores</h2>
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Lista de Jogadores</h2>
             <PlayerList 
               players={players} 
               categories={categories}
@@ -111,12 +112,12 @@ export default function Home() {
 
       {activeTab === 'categories' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Cadastrar Categoria</h2>
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Cadastrar Categoria</h2>
             <CategoryForm onCategoryAdded={fetchCategories} />
           </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Lista de Categorias</h2>
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Lista de Categorias</h2>
             <CategoryList 
               categories={categories}
               onCategoryUpdated={fetchCategories}
@@ -126,8 +127,8 @@ export default function Home() {
       )}
 
       {activeTab === 'games' && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Jogos do Campeonato</h2>
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Jogos do Campeonato</h2>
           <GamesList 
             games={games}
             players={players}
@@ -138,8 +139,8 @@ export default function Home() {
       )}
 
       {activeTab === 'standings' && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Classificação por Categoria</h2>
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Classificação por Categoria</h2>
           <Standings 
             games={games}
             players={players}

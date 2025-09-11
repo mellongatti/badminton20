@@ -78,7 +78,7 @@ export default function CategoryList({ categories, onCategoryUpdated }: Category
 
   if (categories.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-black">
         Nenhuma categoria cadastrada ainda.
       </div>
     )
@@ -87,27 +87,27 @@ export default function CategoryList({ categories, onCategoryUpdated }: Category
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {categories.map((category) => (
-        <div key={category.id} className="bg-gray-50 p-4 rounded-lg border">
+        <div key={category.id} className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm">
           {editingCategory?.id === category.id ? (
             <div className="space-y-3">
               <input
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="w-full border rounded px-3 py-2"
+                className="w-full border rounded px-3 py-2 text-black"
               />
               <div className="flex space-x-2">
                 <button
                   onClick={handleUpdate}
                   disabled={loading}
-                  className="flex-1 bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                  className="flex-1 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
                   Salvar
                 </button>
                 <button
                   onClick={() => setEditingCategory(null)}
                   disabled={loading}
-                  className="flex-1 bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 disabled:opacity-50"
+                  className="flex-1 bg-blue-400 text-white px-3 py-1 rounded text-sm hover:bg-blue-500 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -115,7 +115,7 @@ export default function CategoryList({ categories, onCategoryUpdated }: Category
             </div>
           ) : (
             <div>
-              <h3 className="font-medium text-gray-900 mb-3">{category.name}</h3>
+              <h3 className="font-semibold text-blue-800 mb-3">{category.name}</h3>
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleEdit(category)}

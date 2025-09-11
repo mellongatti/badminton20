@@ -87,7 +87,7 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
 
   if (players.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-black">
         Nenhum jogador cadastrado ainda.
       </div>
     )
@@ -95,21 +95,21 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-blue-200">
+        <thead className="bg-blue-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
               Nome
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
               Categoria
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
               Ações
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-blue-100">
           {players.map((player) => (
             <tr key={player.id}>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -118,10 +118,10 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="border rounded px-2 py-1 w-full"
+                    className="border rounded px-2 py-1 w-full text-black"
                   />
                 ) : (
-                  <div className="text-sm font-medium text-gray-900">{player.name}</div>
+                  <div className="text-sm font-medium text-black">{player.name}</div>
                 )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -129,7 +129,7 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
                   <select
                     value={editCategoryId}
                     onChange={(e) => setEditCategoryId(e.target.value)}
-                    className="border rounded px-2 py-1 w-full"
+                    className="border rounded px-2 py-1 w-full text-black"
                   >
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
@@ -138,7 +138,7 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
                     ))}
                   </select>
                 ) : (
-                  <div className="text-sm text-gray-900">{player.categories?.name}</div>
+                  <div className="text-sm text-black">{player.categories?.name}</div>
                 )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

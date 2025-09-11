@@ -31,6 +31,13 @@ export interface Game {
   player1_score?: number
   player2_score?: number
   winner_id?: number
+  set1_player1?: number
+  set1_player2?: number
+  set2_player1?: number
+  set2_player2?: number
+  set3_player1?: number
+  set3_player2?: number
+  is_editable?: boolean
   created_at: string
   player1?: {
     name: string
