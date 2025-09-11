@@ -62,9 +62,10 @@ export default function Home() {
 
   const tabs = [
     { id: 'players', name: 'Jogadores', icon: '👤' },
-    { id: 'categories', name: 'Categorias', icon: '🏆' },
     { id: 'games', name: 'Jogos', icon: '🏸' },
-    { id: 'standings', name: 'Classificação', icon: '📊' }
+    { id: 'standings', name: 'Classificação', icon: '📊' },
+    { id: 'categories', name: 'Categorias', icon: '🏆' },
+    { id: 'settings', name: 'Configurações', icon: '⚙️' }
   ]
 
   return (
@@ -145,6 +146,19 @@ export default function Home() {
             games={games}
             players={players}
             categories={categories}
+          />
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Configurações do Sistema</h2>
+          <GamesList 
+            games={games}
+            players={players}
+            categories={categories}
+            onGamesUpdated={fetchGames}
+            settingsMode={true}
           />
         </div>
       )}

@@ -29,13 +29,15 @@ interface GamesListProps {
   players: any[]
   categories: any[]
   onGamesUpdated: () => void
+  settingsMode?: boolean
 }
 
-export default function GamesList({ games, players, categories, onGamesUpdated }: GamesListProps) {
+export default function GamesList({ games, players, categories, onGamesUpdated, settingsMode = false }: GamesListProps) {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [loading, setLoading] = useState(false)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPlayer, setFilterPlayer] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
 
   const deleteGame = async (gameId: number) => {
     if (!confirm('Tem certeza que deseja excluir este jogo?')) {
@@ -263,6 +265,35 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
     }
   }
 
+  // Se estiver no modo configurações, mostrar apenas as ferramentas de manutenção
+  if (settingsMode) {
+    return (
+      <div className="space-y-6">
+        {/* Ferramentas de Manutenção */}
+        <div className="bg-red-50 p-6 rounded-lg border border-red-200">
+          <h3 className="text-lg font-semibold mb-4 text-red-800">🛠️ Ferramentas de Manutenção</h3>
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded border border-red-100">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-sm font-medium text-red-800 mb-1">Remover Jogos Duplicados</h4>
+                  <p className="text-xs text-gray-600">Remove automaticamente jogos duplicados do sistema</p>
+                </div>
+                <button
+                  onClick={removeDuplicateGames}
+                  disabled={loading}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 text-sm"
+                >
+                  {loading ? 'Removendo...' : '🗑️ Remover Duplicatas'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Gerador de Jogos */}
@@ -294,27 +325,12 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
             {loading ? 'Gerando...' : 'Gerar Jogos'}
           </button>
         </div>
-        <div className="border-t border-blue-200 pt-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h4 className="text-sm font-medium text-blue-800 mb-1">Manutenção de Jogos</h4>
-              <p className="text-xs text-gray-600">Remover jogos duplicados do sistema</p>
-            </div>
-            <button
-              onClick={removeDuplicateGames}
-              disabled={loading}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 text-sm"
-            >
-              {loading ? 'Removendo...' : '🗑️ Remover Duplicatas'}
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Filtros */}
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
         <h3 className="text-lg font-semibold mb-4 text-blue-800">Filtros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-black mb-1">
               Filtrar por Categoria
@@ -349,6 +365,20 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Filtrar por Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-black"
+            >
+              <option value="">Todos os status</option>
+              <option value="pendente">🟡 Pendentes</option>
+              <option value="finalizado">🟢 Finalizados</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -376,6 +406,13 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
                   )
                 }
                 
+                if (filterStatus) {
+                  filteredGames = filteredGames.filter(game => {
+                    const isFinished = game.winner_id !== null && game.winner_id !== undefined
+                    return filterStatus === 'finalizado' ? isFinished : !isFinished
+                  })
+                }
+                
                 return filteredGames.length
               })()} jogos
             </span>
@@ -393,6 +430,13 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
             filteredGames = filteredGames.filter(game => 
               game.player1_id.toString() === filterPlayer || game.player2_id.toString() === filterPlayer
             )
+          }
+          
+          if (filterStatus) {
+            filteredGames = filteredGames.filter(game => {
+              const isFinished = game.winner_id !== null && game.winner_id !== undefined
+              return filterStatus === 'finalizado' ? isFinished : !isFinished
+            })
           }
           
           return filteredGames.length === 0 ? (
