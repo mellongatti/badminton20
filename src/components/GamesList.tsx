@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Game {
@@ -152,7 +152,7 @@ export default function GamesList({ games, players, categories, onGamesUpdated }
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 text-black"
             >
               <option value="">Selecione uma categoria</option>
               {categories.map((category) => (
@@ -238,7 +238,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, loading }: GameCardProps
             type="date"
             value={gameDate}
             onChange={(e) => handleDateChange(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm text-black"
             disabled={loading}
           />
         </div>
@@ -252,7 +252,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, loading }: GameCardProps
             min="0"
             value={player1Score}
             onChange={(e) => setPlayer1Score(parseInt(e.target.value) || 0)}
-            className="w-16 border rounded px-2 py-1 text-center mt-1"
+            className="w-16 border rounded px-2 py-1 text-center mt-1 text-black"
             disabled={loading}
           />
         </div>
@@ -268,7 +268,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, loading }: GameCardProps
             min="0"
             value={player2Score}
             onChange={(e) => setPlayer2Score(parseInt(e.target.value) || 0)}
-            className="w-16 border rounded px-2 py-1 text-center mt-1"
+            className="w-16 border rounded px-2 py-1 text-center mt-1 text-black"
             disabled={loading}
           />
         </div>

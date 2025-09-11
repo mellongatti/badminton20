@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface PlayerFormProps {
@@ -56,7 +56,7 @@ export default function PlayerForm({ categories, onPlayerAdded }: PlayerFormProp
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2 text-black placeholder-gray-500"
           placeholder="Digite o nome do jogador"
           required
         />
@@ -70,7 +70,7 @@ export default function PlayerForm({ categories, onPlayerAdded }: PlayerFormProp
           id="category"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2 text-black"
           required
         >
           <option value="">Selecione uma categoria</option>
