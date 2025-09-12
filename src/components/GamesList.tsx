@@ -22,6 +22,7 @@ interface Game {
   set3_player2?: number
   is_editable?: boolean
   is_doubles?: boolean
+  is_wo?: boolean
   player1?: { name: string }
   player2?: { name: string }
   team1?: { name: string }
@@ -71,7 +72,19 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
   }, [])
 
   const deleteGame = async (gameId: number) => {
-    if (!confirm('Tem certeza que deseja excluir este jogo?')) {
+    // Solicitar senha do sistema
+    const password = prompt('⚠️ ATENÇÃO: Esta ação não pode ser desfeita!\n\nPara excluir este jogo, digite a senha do sistema:')
+    
+    if (!password) {
+      return // Usuário cancelou
+    }
+    
+    if (password !== 'zendesk') {
+      alert('❌ Senha incorreta! Exclusão cancelada.')
+      return
+    }
+
+    if (!confirm('Tem certeza que deseja excluir este jogo?\n\nEsta ação não pode ser desfeita!')) {
       return
     }
 
@@ -84,14 +97,14 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
 
       if (error) {
         console.error('Erro ao excluir jogo:', error)
-        alert('Erro ao excluir jogo')
+        alert('❌ Erro ao excluir jogo')
       } else {
         onGamesUpdated()
-        alert('Jogo excluído com sucesso!')
+        alert('✅ Jogo excluído com sucesso!')
       }
     } catch (error) {
       console.error('Erro:', error)
-      alert('Erro ao excluir jogo')
+      alert('❌ Erro ao excluir jogo')
     } finally {
       setLoading(false)
     }
@@ -710,7 +723,7 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
             })
           }
           
-          // Ordenar jogos: pendentes primeiro, depois finalizados
+          // Ordenar jogos: pendentes primeiro, depois finalizados, ambos em ordem alfabética
           filteredGames = filteredGames.sort((a, b) => {
             const aIsPending = !a.winner_id
             const bIsPending = !b.winner_id
@@ -719,8 +732,15 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
             if (aIsPending && !bIsPending) return -1
             if (!aIsPending && bIsPending) return 1
             
-            // Se ambos têm o mesmo status, manter ordem original (por ID)
-            return a.id - b.id
+            // Se ambos têm o mesmo status, ordenar alfabeticamente pelos nomes dos jogadores/duplas
+            const aName = a.is_doubles 
+              ? `${a.team1?.name || ''} vs ${a.team2?.name || ''}`
+              : `${a.player1?.name || ''} vs ${a.player2?.name || ''}`
+            const bName = b.is_doubles 
+              ? `${b.team1?.name || ''} vs ${b.team2?.name || ''}`
+              : `${b.player1?.name || ''} vs ${b.player2?.name || ''}`
+            
+            return aName.localeCompare(bName, 'pt-BR', { sensitivity: 'base' })
           })
           
           return filteredGames.length === 0 ? (
@@ -765,6 +785,7 @@ interface GameCardProps {
 function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }: GameCardProps) {
   const [isEditing, setIsEditing] = useState(!game.winner_id)
   const [gameDate, setGameDate] = useState(game.game_date || '')
+  const [isWO, setIsWO] = useState(false)
   
   // Estados para os 3 sets
   const [set1Player1, setSet1Player1] = useState(game.set1_player1 || 0)
@@ -774,10 +795,59 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
   const [set3Player1, setSet3Player1] = useState(game.set3_player1 || 0)
   const [set3Player2, setSet3Player2] = useState(game.set3_player2 || 0)
 
+  const handleWO = (winnerSide: 'player1' | 'player2') => {
+    if (!confirm(`Confirma WO (Walk Over) para ${winnerSide === 'player1' ? 
+      (game.is_doubles ? game.team1?.name : game.player1?.name) : 
+      (game.is_doubles ? game.team2?.name : game.player2?.name)}?`)) {
+      return
+    }
+
+    let winnerId: number | undefined
+    
+    if (game.is_doubles) {
+      winnerId = winnerSide === 'player1' ? game.team1_id : game.team2_id
+      if (!game.team1_id || !game.team2_id) {
+        alert('Erro: IDs das duplas não encontrados.')
+        return
+      }
+    } else {
+      winnerId = winnerSide === 'player1' ? game.player1_id : game.player2_id
+      if (!game.player1_id || !game.player2_id) {
+        alert('Erro: IDs dos jogadores não encontrados.')
+        return
+      }
+    }
+
+    if (!winnerId) {
+      alert('Erro: Não foi possível determinar o vencedor.')
+      return
+    }
+
+    // Para WO, definir placar como 2-0 em sets (vencedor ganha por WO)
+    const sets = {
+      set1_player1: winnerSide === 'player1' ? 21 : 0,
+      set1_player2: winnerSide === 'player1' ? 0 : 21,
+      set2_player1: winnerSide === 'player1' ? 21 : 0,
+      set2_player2: winnerSide === 'player1' ? 0 : 21,
+      set3_player1: 0,
+      set3_player2: 0,
+      is_wo: true
+    }
+
+    onUpdateResult(game.id, sets, winnerId)
+    setIsEditing(false)
+    setIsWO(false)
+  }
+
   const handleSubmitResult = () => {
+    // Se for WO, não validar sets
+    if (isWO) {
+      return // WO é tratado pelos botões específicos
+    }
+
     // Verificar se pelo menos um set foi preenchido
     if (set1Player1 === 0 && set1Player2 === 0) {
-      alert('Preencha pelo menos o primeiro set')
+      alert('Preencha pelo menos o primeiro set ou declare WO')
       return
     }
     
@@ -795,7 +865,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
     else if (set3Player2 > set3Player1) player2Sets++
     
     if (player1Sets === player2Sets) {
-      alert('Deve haver um vencedor (quem ganhou mais sets)')
+      alert('Deve haver um vencedor (quem ganhou mais sets) ou declare WO')
       return
     }
     
@@ -911,6 +981,28 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
             Placares dos Sets
           </h5>
         </div>
+
+        {/* Opção de WO */}
+        {isEditing && (
+          <div className="text-center mb-2">
+            <div className="flex gap-1 justify-center">
+              <button
+                onClick={() => handleWO('player1')}
+                disabled={loading}
+                className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50 transition-all"
+              >
+                🚫 WO {game.is_doubles ? game.team1?.name : game.player1?.name}
+              </button>
+              <button
+                onClick={() => handleWO('player2')}
+                disabled={loading}
+                className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50 transition-all"
+              >
+                🚫 WO {game.is_doubles ? game.team2?.name : game.player2?.name}
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* Sets */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -998,6 +1090,14 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
               <span>{loading ? '⏳' : '💾'}</span>
               {loading ? 'Salvando...' : 'Salvar Resultado'}
             </button>
+            <button
+              onClick={() => onDeleteGame(game.id)}
+              disabled={loading}
+              className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-all shadow-md hover:shadow-lg font-medium"
+            >
+              <span>🗑️</span>
+              Excluir
+            </button>
             {game.winner_id && (
               <button
                 onClick={handleCancel}
@@ -1035,14 +1135,20 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
       {game.winner_id && (
         <div className="mt-4 text-center">
           <p className="text-sm text-green-600 font-medium">
-            🏆 Vencedor: {game.is_doubles 
+            {game.is_wo ? '🚫 WO - Vencedor' : '🏆 Vencedor'}: {game.is_doubles 
               ? (game.winner_id === game.team1_id ? game.team1?.name : game.team2?.name)
               : (game.winner_id === game.player1_id ? game.player1?.name : game.player2?.name)
             }
           </p>
-          <p className="text-xs text-black">
-            Placar total: {game.player1_score || 0} x {game.player2_score || 0}
-          </p>
+          {game.is_wo ? (
+            <p className="text-xs text-red-600 font-medium">
+              ⚠️ Jogo finalizado por Walk Over (WO)
+            </p>
+          ) : (
+            <p className="text-xs text-black">
+              Placar total: {game.player1_score || 0} x {game.player2_score || 0}
+            </p>
+          )}
         </div>
       )}
     </div>

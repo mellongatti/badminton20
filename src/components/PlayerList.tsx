@@ -346,7 +346,7 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-blue-100">
-                  {teams.map((team) => (
+                  {teams.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })).map((team) => (
                     <tr key={team.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-black">{team.name}</div>
@@ -394,7 +394,7 @@ export default function PlayerList({ players, categories, onPlayerUpdated }: Pla
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-blue-100">
-          {players.map((player) => (
+          {players.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })).map((player) => (
             <tr key={player.id}>
               <td className="px-6 py-4 whitespace-nowrap">
                 {editingPlayer?.id === player.id ? (

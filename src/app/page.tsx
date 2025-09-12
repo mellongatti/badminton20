@@ -7,6 +7,7 @@ import PlayerList from '@/components/PlayerList'
 import CategoryForm from '@/components/CategoryForm'
 import CategoryList from '@/components/CategoryList'
 import GamesList from '@/components/GamesList'
+import GameSchedule from '@/components/GameSchedule'
 import Standings from '@/components/Standings'
 import Login from '@/components/Login'
 
@@ -90,6 +91,7 @@ export default function Home() {
   const tabs = [
     { id: 'players', name: 'Jogadores', icon: '👤' },
     { id: 'games', name: 'Jogos', icon: '🏸' },
+    { id: 'schedule', name: 'Agendamento', icon: '📅' },
     { id: 'standings', name: 'Classificação', icon: '📊' },
     { id: 'categories', name: 'Categorias', icon: '🏆' },
     { id: 'settings', name: 'Configurações', icon: '⚙️' }
@@ -178,6 +180,17 @@ export default function Home() {
           <GamesList 
             games={games}
             players={players}
+            categories={categories}
+            onGamesUpdated={fetchGames}
+          />
+        </div>
+      )}
+
+      {activeTab === 'schedule' && (
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Agendamento de Jogos</h2>
+          <GameSchedule 
+            games={games}
             categories={categories}
             onGamesUpdated={fetchGames}
           />
