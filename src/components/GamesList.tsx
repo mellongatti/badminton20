@@ -602,12 +602,13 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
                 let filteredGames = games
                 
                 if (filterCategory) {
-                  filteredGames = filteredGames.filter(game => game.category_id.toString() === filterCategory)
+                  filteredGames = filteredGames.filter(game => game.category_id && game.category_id.toString() === filterCategory)
                 }
                 
                 if (filterPlayer) {
                   filteredGames = filteredGames.filter(game => 
-                    game.player1_id.toString() === filterPlayer || game.player2_id.toString() === filterPlayer
+                    (game.player1_id && game.player1_id.toString() === filterPlayer) || 
+                    (game.player2_id && game.player2_id.toString() === filterPlayer)
                   )
                 }
                 
@@ -659,13 +660,29 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
           let filteredGames = games
           
           if (filterCategory) {
-            filteredGames = filteredGames.filter(game => game.category_id.toString() === filterCategory)
+            filteredGames = filteredGames.filter(game => game.category_id && game.category_id.toString() === filterCategory)
           }
           
           if (filterPlayer) {
-            filteredGames = filteredGames.filter(game => 
-              game.player1_id.toString() === filterPlayer || game.player2_id.toString() === filterPlayer
-            )
+            filteredGames = filteredGames.filter(game => {
+              // Para jogos individuais
+              const isInIndividualGame = (game.player1_id && game.player1_id.toString() === filterPlayer) || 
+                                       (game.player2_id && game.player2_id.toString() === filterPlayer)
+              
+              // Para jogos de duplas - verificar se o jogador está em alguma das duplas
+              const isInDoublesGame = game.is_doubles && (
+                (game.team1_id && teams.some(team => 
+                  team.id === game.team1_id && 
+                  (team.player1_id.toString() === filterPlayer || team.player2_id.toString() === filterPlayer)
+                )) ||
+                (game.team2_id && teams.some(team => 
+                  team.id === game.team2_id && 
+                  (team.player1_id.toString() === filterPlayer || team.player2_id.toString() === filterPlayer)
+                ))
+              )
+              
+              return isInIndividualGame || isInDoublesGame
+            })
           }
           
           if (filterStatus) {
