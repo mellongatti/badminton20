@@ -1,32 +1,20 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import DoublesStandings from './DoublesStandings'
+import React from 'react'
+import { useMemo } from 'react'
 
 interface Game {
   id: number
-  player1_id: number
-  player2_id: number
+  team1_id?: number
+  team2_id?: number
   category_id: number
   player1_score?: number
   player2_score?: number
   winner_id?: number
-  player1?: { name: string }
-  player2?: { name: string }
+  is_doubles?: boolean
+  team1?: { name: string }
+  team2?: { name: string }
   category?: { name: string }
-}
-
-interface Player {
-  id: number
-  name: string
-  category_id: number
-  categories?: { name: string }
-}
-
-interface Category {
-  id: number
-  name: string
 }
 
 interface Team {
@@ -40,15 +28,20 @@ interface Team {
   categories?: { name: string }
 }
 
-interface StandingsProps {
+interface Category {
+  id: number
+  name: string
+}
+
+interface DoublesStandingsProps {
   games: Game[]
-  players: Player[]
+  teams: Team[]
   categories: Category[]
 }
 
-interface PlayerStats {
-  playerId: number
-  playerName: string
+interface TeamStats {
+  teamId: number
+  teamName: string
   wins: number
   losses: number
   gamesPlayed: number
@@ -57,50 +50,25 @@ interface PlayerStats {
   winPercentage: number
 }
 
-export default function Standings({ games, players, categories }: StandingsProps) {
-  const [activeTab, setActiveTab] = useState<'individual' | 'doubles'>('individual')
-  const [teams, setTeams] = useState<Team[]>([])
-
-  // Carregar duplas
-  const loadTeams = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select(`
-          *,
-          player1:players!teams_player1_id_fkey(name),
-          player2:players!teams_player2_id_fkey(name),
-          categories(name)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Erro ao carregar duplas:', error)
-      } else {
-        setTeams(data || [])
-      }
-    } catch (error) {
-      console.error('Erro:', error)
-    }
-  }
-
-  useEffect(() => {
-    loadTeams()
-  }, [])
+export default function DoublesStandings({ games, teams, categories }: DoublesStandingsProps) {
   const standingsByCategory = useMemo(() => {
-    const categoryStandings: { [categoryId: number]: PlayerStats[] } = {}
+    const categoryStandings: { [categoryId: number]: TeamStats[] } = {}
 
     categories.forEach(category => {
-      const categoryPlayers = players.filter(p => p.category_id === category.id)
-      const categoryGames = games.filter(g => g.category_id === category.id && g.winner_id)
+      const categoryTeams = teams.filter(t => t.category_id === category.id)
+      const categoryGames = games.filter(g => 
+        g.category_id === category.id && 
+        g.is_doubles === true && 
+        g.winner_id
+      )
 
-      const playerStats: { [playerId: number]: PlayerStats } = {}
+      const teamStats: { [teamId: number]: TeamStats } = {}
 
-      // Inicializar stats para todos os jogadores da categoria
-      categoryPlayers.forEach(player => {
-        playerStats[player.id] = {
-          playerId: player.id,
-          playerName: player.name,
+      // Inicializar stats para todas as duplas da categoria
+      categoryTeams.forEach(team => {
+        teamStats[team.id] = {
+          teamId: team.id,
+          teamName: team.name,
           wins: 0,
           losses: 0,
           gamesPlayed: 0,
@@ -110,42 +78,43 @@ export default function Standings({ games, players, categories }: StandingsProps
         }
       })
 
-      // Calcular estatísticas baseadas nos jogos
+      // Calcular estatísticas baseadas nos jogos de duplas
       categoryGames.forEach(game => {
-        if (game.player1_score !== undefined && game.player2_score !== undefined) {
-          const player1Stats = playerStats[game.player1_id]
-          const player2Stats = playerStats[game.player2_id]
+        if (game.player1_score !== undefined && game.player2_score !== undefined && game.team1_id && game.team2_id) {
+          const team1Stats = teamStats[game.team1_id]
+          const team2Stats = teamStats[game.team2_id]
 
-          if (player1Stats && player2Stats) {
+          if (team1Stats && team2Stats) {
             // Atualizar jogos disputados
-            player1Stats.gamesPlayed++
-            player2Stats.gamesPlayed++
+            team1Stats.gamesPlayed++
+            team2Stats.gamesPlayed++
 
             // Atualizar pontos
-            player1Stats.pointsFor += game.player1_score
-            player1Stats.pointsAgainst += game.player2_score
-            player2Stats.pointsFor += game.player2_score
-            player2Stats.pointsAgainst += game.player1_score
+            team1Stats.pointsFor += game.player1_score
+            team1Stats.pointsAgainst += game.player2_score
+            team2Stats.pointsFor += game.player2_score
+            team2Stats.pointsAgainst += game.player1_score
 
             // Atualizar vitórias e derrotas
-            if (game.winner_id === game.player1_id) {
-              player1Stats.wins++
-              player2Stats.losses++
-            } else if (game.winner_id === game.player2_id) {
-              player2Stats.wins++
-              player1Stats.losses++
+            // Para duplas, o winner_id pode ser team1_id ou team2_id
+            if (game.winner_id === game.team1_id) {
+              team1Stats.wins++
+              team2Stats.losses++
+            } else if (game.winner_id === game.team2_id) {
+              team2Stats.wins++
+              team1Stats.losses++
             }
           }
         }
       })
 
       // Calcular porcentagem de vitórias
-      Object.values(playerStats).forEach(stats => {
+      Object.values(teamStats).forEach(stats => {
         stats.winPercentage = stats.gamesPlayed > 0 ? (stats.wins / stats.gamesPlayed) * 100 : 0
       })
 
       // Ordenar por: 1) % vitórias, 2) número de vitórias, 3) saldo de pontos
-      const sortedStats = Object.values(playerStats)
+      const sortedStats = Object.values(teamStats)
         .filter(stats => stats.gamesPlayed > 0) // Só mostrar quem jogou
         .sort((a, b) => {
           if (b.winPercentage !== a.winPercentage) {
@@ -163,45 +132,18 @@ export default function Standings({ games, players, categories }: StandingsProps
     })
 
     return categoryStandings
-  }, [games, players, categories])
+  }, [games, teams, categories])
 
   return (
     <div className="space-y-8">
-      {/* Abas de navegação */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('individual')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'individual'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Classificação Individual
-        </button>
-        <button
-          onClick={() => setActiveTab('doubles')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'doubles'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Classificação de Duplas
-        </button>
-      </div>
-
-      {/* Conteúdo baseado na aba ativa */}
-      {activeTab === 'individual' ? (
-        <div className="space-y-8">
       {categories.map(category => {
         const standings = standingsByCategory[category.id] || []
         
         if (standings.length === 0) {
           return (
             <div key={category.id} className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm">
-              <h3 className="text-xl font-bold mb-4 text-blue-800">{category.name}</h3>
-              <p className="text-black">Nenhum jogo finalizado nesta categoria ainda.</p>
+              <h3 className="text-xl font-bold mb-4 text-blue-800">{category.name} - Duplas</h3>
+              <p className="text-black">Nenhum jogo de duplas finalizado nesta categoria ainda.</p>
             </div>
           )
         }
@@ -209,7 +151,7 @@ export default function Standings({ games, players, categories }: StandingsProps
         return (
           <div key={category.id} className="bg-white border rounded-xl overflow-hidden shadow-lg border-blue-100">
             <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
-              <h3 className="text-xl font-bold text-blue-800">{category.name}</h3>
+              <h3 className="text-xl font-bold text-blue-800">{category.name} - Duplas</h3>
             </div>
             
             <div className="overflow-x-auto">
@@ -220,7 +162,7 @@ export default function Standings({ games, players, categories }: StandingsProps
                       Posição
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase tracking-wider">
-                      Jogador
+                      Dupla
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Jogos
@@ -232,13 +174,13 @@ export default function Standings({ games, players, categories }: StandingsProps
                       Derrotas
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
+                      % Vitórias
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Sets Ganhos
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Sets Perdidos
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
-                      Pontos
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-blue-800 uppercase tracking-wider">
                       Saldo
@@ -251,7 +193,7 @@ export default function Standings({ games, players, categories }: StandingsProps
                     const isChampion = index === 0
                     
                     return (
-                      <tr key={stats.playerId} className={isChampion ? 'bg-yellow-50' : ''}>
+                      <tr key={stats.teamId} className={isChampion ? 'bg-yellow-50' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className={`text-sm font-medium ${
                             isChampion ? 'text-yellow-600' : 'text-black'
@@ -264,7 +206,7 @@ export default function Standings({ games, players, categories }: StandingsProps
                           <div className={`text-sm font-medium ${
                             isChampion ? 'text-yellow-600' : 'text-black'
                           }`}>
-                            {stats.playerName}
+                            {stats.teamName}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-black">
@@ -298,14 +240,10 @@ export default function Standings({ games, players, categories }: StandingsProps
         )
       })}
       
-          {categories.length === 0 && (
-            <div className="text-center py-8 text-black">
-              Nenhuma categoria cadastrada ainda.
-            </div>
-          )}
+      {categories.length === 0 && (
+        <div className="text-center py-8 text-black">
+          Nenhuma categoria cadastrada ainda.
         </div>
-      ) : (
-        <DoublesStandings games={games} teams={teams} categories={categories} />
       )}
     </div>
   )

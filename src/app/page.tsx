@@ -46,6 +46,8 @@ export default function Home() {
         *,
         player1:players!games_player1_id_fkey(name),
         player2:players!games_player2_id_fkey(name),
+        team1:teams!team1_id(name),
+        team2:teams!team2_id(name),
         category:categories(name)
       `)
       .order('created_at', { ascending: false })

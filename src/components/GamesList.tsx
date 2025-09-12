@@ -5,8 +5,10 @@ import { supabase } from '@/lib/supabase'
 
 interface Game {
   id: number
-  player1_id: number
-  player2_id: number
+  player1_id?: number
+  player2_id?: number
+  team1_id?: number
+  team2_id?: number
   category_id: number
   game_date?: string
   player1_score?: number
@@ -19,8 +21,11 @@ interface Game {
   set3_player1?: number
   set3_player2?: number
   is_editable?: boolean
+  is_doubles?: boolean
   player1?: { name: string }
   player2?: { name: string }
+  team1?: { name: string }
+  team2?: { name: string }
   category?: { name: string }
 }
 
@@ -38,6 +43,32 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPlayer, setFilterPlayer] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterGameType, setFilterGameType] = useState('')
+  const [gameType, setGameType] = useState<'individual' | 'doubles'>('individual')
+  const [teams, setTeams] = useState<any[]>([])
+
+  // Carregar duplas
+  const loadTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('*')
+        .order('name')
+
+      if (error) {
+        console.error('Erro ao carregar duplas:', error)
+      } else {
+        setTeams(data || [])
+      }
+    } catch (error) {
+      console.error('Erro:', error)
+    }
+  }
+
+  React.useEffect(() => {
+    loadTeams()
+  }, [])
 
   const deleteGame = async (gameId: number) => {
     if (!confirm('Tem certeza que deseja excluir este jogo?')) {
@@ -134,74 +165,148 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
 
     setLoading(true)
     try {
-      // Buscar jogadores da categoria selecionada
-      const categoryPlayers = players.filter(p => p.category_id.toString() === selectedCategory)
-      
-      if (categoryPlayers.length < 2) {
-        alert('É necessário pelo menos 2 jogadores na categoria para gerar jogos')
-        setLoading(false)
-        return
-      }
-
-      // Buscar jogos já existentes para esta categoria
-      const { data: existingGames } = await supabase
-        .from('games')
-        .select('player1_id, player2_id')
-        .eq('category_id', selectedCategory)
-
-      // Criar um Set com as combinações já existentes para verificação rápida
-      const existingCombinations = new Set()
-      if (existingGames) {
-        existingGames.forEach(game => {
-          // Adicionar ambas as combinações (player1-player2 e player2-player1)
-          existingCombinations.add(`${game.player1_id}-${game.player2_id}`)
-          existingCombinations.add(`${game.player2_id}-${game.player1_id}`)
-        })
-      }
-
-      // Gerar apenas os jogos que ainda não existem
-      const newGames = []
-      for (let i = 0; i < categoryPlayers.length; i++) {
-        for (let j = i + 1; j < categoryPlayers.length; j++) {
-          const player1Id = categoryPlayers[i].id
-          const player2Id = categoryPlayers[j].id
-          const combination = `${player1Id}-${player2Id}`
-          
-          // Verificar se esta combinação já existe
-          if (!existingCombinations.has(combination)) {
-            newGames.push({
-              player1_id: player1Id,
-              player2_id: player2Id,
-              category_id: parseInt(selectedCategory)
-            })
-          }
-        }
-      }
-
-      // Verificar se há novos jogos para inserir
-      if (newGames.length === 0) {
-        alert('Todos os jogos possíveis já foram gerados para esta categoria!')
-        setLoading(false)
-        return
-      }
-
-      // Inserir apenas os novos jogos no banco
-      const { error } = await supabase
-        .from('games')
-        .insert(newGames)
-
-      if (error) {
-        console.error('Erro ao gerar jogos:', error)
-        alert('Erro ao gerar jogos')
+      if (gameType === 'individual') {
+        await generateIndividualGames()
       } else {
-        onGamesUpdated()
-        alert(`${newGames.length} jogos gerados com sucesso!`)
+        await generateDoublesGames()
       }
     } catch (error) {
       console.error('Erro:', error)
       alert('Erro ao gerar jogos')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const generateIndividualGames = async () => {
+    // Buscar jogadores da categoria selecionada
+    const categoryPlayers = players.filter(p => p.category_id.toString() === selectedCategory)
+    
+    if (categoryPlayers.length < 2) {
+      alert('É necessário pelo menos 2 jogadores na categoria para gerar jogos')
+      return
+    }
+
+    // Buscar jogos já existentes para esta categoria
+    const { data: existingGames } = await supabase
+      .from('games')
+      .select('player1_id, player2_id')
+      .eq('category_id', selectedCategory)
+      .eq('is_doubles', false)
+
+    // Criar um Set com as combinações já existentes para verificação rápida
+    const existingCombinations = new Set()
+    if (existingGames) {
+      existingGames.forEach(game => {
+        // Adicionar ambas as combinações (player1-player2 e player2-player1)
+        existingCombinations.add(`${game.player1_id}-${game.player2_id}`)
+        existingCombinations.add(`${game.player2_id}-${game.player1_id}`)
+      })
+    }
+
+    // Gerar apenas os jogos que ainda não existem
+    const newGames = []
+    for (let i = 0; i < categoryPlayers.length; i++) {
+      for (let j = i + 1; j < categoryPlayers.length; j++) {
+        const player1Id = categoryPlayers[i].id
+        const player2Id = categoryPlayers[j].id
+        const combination = `${player1Id}-${player2Id}`
+        
+        // Verificar se esta combinação já existe
+        if (!existingCombinations.has(combination)) {
+          newGames.push({
+            player1_id: player1Id,
+            player2_id: player2Id,
+            category_id: parseInt(selectedCategory),
+            is_doubles: false
+          })
+        }
+      }
+    }
+
+    // Verificar se há novos jogos para inserir
+    if (newGames.length === 0) {
+      alert('Todos os jogos individuais possíveis já foram gerados para esta categoria!')
+      return
+    }
+
+    // Inserir apenas os novos jogos no banco
+    const { error } = await supabase
+      .from('games')
+      .insert(newGames)
+
+    if (error) {
+      console.error('Erro ao gerar jogos:', error)
+      alert('Erro ao gerar jogos')
+    } else {
+      onGamesUpdated()
+      alert(`${newGames.length} jogos individuais gerados com sucesso!`)
+    }
+  }
+
+  const generateDoublesGames = async () => {
+    // Buscar duplas da categoria selecionada
+    const categoryTeams = teams.filter(t => t.category_id.toString() === selectedCategory)
+    
+    if (categoryTeams.length < 2) {
+      alert('É necessário pelo menos 2 duplas na categoria para gerar jogos')
+      return
+    }
+
+    // Buscar jogos de duplas já existentes para esta categoria
+    const { data: existingGames } = await supabase
+      .from('games')
+      .select('team1_id, team2_id')
+      .eq('category_id', selectedCategory)
+      .eq('is_doubles', true)
+
+    // Criar um Set com as combinações já existentes para verificação rápida
+    const existingCombinations = new Set()
+    if (existingGames) {
+      existingGames.forEach(game => {
+        // Adicionar ambas as combinações (team1-team2 e team2-team1)
+        existingCombinations.add(`${game.team1_id}-${game.team2_id}`)
+        existingCombinations.add(`${game.team2_id}-${game.team1_id}`)
+      })
+    }
+
+    // Gerar apenas os jogos que ainda não existem
+    const newGames = []
+    for (let i = 0; i < categoryTeams.length; i++) {
+      for (let j = i + 1; j < categoryTeams.length; j++) {
+        const team1Id = categoryTeams[i].id
+        const team2Id = categoryTeams[j].id
+        const combination = `${team1Id}-${team2Id}`
+        
+        // Verificar se esta combinação já existe
+        if (!existingCombinations.has(combination)) {
+          newGames.push({
+            team1_id: team1Id,
+            team2_id: team2Id,
+            category_id: parseInt(selectedCategory),
+            is_doubles: true
+          })
+        }
+      }
+    }
+
+    // Verificar se há novos jogos para inserir
+    if (newGames.length === 0) {
+      alert('Todos os jogos de duplas possíveis já foram gerados para esta categoria!')
+      return
+    }
+
+    // Inserir apenas os novos jogos no banco
+    const { error } = await supabase
+      .from('games')
+      .insert(newGames)
+
+    if (error) {
+      console.error('Erro ao gerar jogos de duplas:', error)
+      alert('Erro ao gerar jogos de duplas')
+    } else {
+      onGamesUpdated()
+      alert(`${newGames.length} jogos de duplas gerados com sucesso!`)
     }
   }
 
@@ -212,25 +317,53 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
       const player1Total = (sets.set1_player1 || 0) + (sets.set2_player1 || 0) + (sets.set3_player1 || 0)
       const player2Total = (sets.set1_player2 || 0) + (sets.set2_player2 || 0) + (sets.set3_player2 || 0)
       
+      // Primeiro, verificar se o jogo existe e se é de duplas
+      const { data: gameData, error: fetchError } = await supabase
+        .from('games')
+        .select('is_doubles')
+        .eq('id', gameId)
+        .single()
+
+      if (fetchError) {
+        console.error('Erro ao buscar jogo:', fetchError)
+        alert('Erro ao buscar informações do jogo')
+        return
+      }
+
+      // Preparar dados para atualização
+      const updateData: any = {
+        set1_player1: sets.set1_player1 || 0,
+        set1_player2: sets.set1_player2 || 0,
+        set2_player1: sets.set2_player1 || 0,
+        set2_player2: sets.set2_player2 || 0,
+        set3_player1: sets.set3_player1 || 0,
+        set3_player2: sets.set3_player2 || 0,
+        player1_score: player1Total,
+        player2_score: player2Total,
+        winner_id: winnerId
+      }
+
+      // Adicionar is_editable apenas se a coluna existir
+      try {
+        updateData.is_editable = true
+      } catch (e) {
+        // Ignorar se a coluna não existir
+      }
+      
       const { error } = await supabase
         .from('games')
-        .update({
-          set1_player1: sets.set1_player1 || 0,
-          set1_player2: sets.set1_player2 || 0,
-          set2_player1: sets.set2_player1 || 0,
-          set2_player2: sets.set2_player2 || 0,
-          set3_player1: sets.set3_player1 || 0,
-          set3_player2: sets.set3_player2 || 0,
-          player1_score: player1Total,
-          player2_score: player2Total,
-          winner_id: winnerId,
-          is_editable: true
-        })
+        .update(updateData)
         .eq('id', gameId)
 
       if (error) {
         console.error('Erro ao atualizar resultado:', error)
-        alert('Erro ao salvar resultado')
+        
+        // Verificar se o erro é relacionado a colunas inexistentes
+        if (error.message.includes('column') && error.message.includes('does not exist')) {
+          alert('⚠️ ERRO: As colunas necessárias para jogos de duplas não existem no banco de dados.\n\nPara resolver:\n1. Abra o Supabase Dashboard\n2. Vá para SQL Editor\n3. Execute o script "add-doubles-games-support.sql"')
+        } else {
+          alert('Erro ao salvar resultado: ' + error.message)
+        }
       } else {
         onGamesUpdated()
         alert('Resultado salvo com sucesso!')
@@ -299,38 +432,85 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
       {/* Gerador de Jogos */}
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="text-lg font-semibold mb-4 text-blue-800">Gerar Jogos por Categoria</h3>
-        <div className="flex gap-4 items-end mb-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-black mb-1">
-              Categoria
+        <div className="space-y-4">
+          {/* Seletor de Tipo de Jogo */}
+          <div>
+            <label className="block text-sm font-medium text-black mb-2">
+              Tipo de Jogo
             </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full border rounded px-3 py-2 text-black"
-            >
-              <option value="">Selecione uma categoria</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="gameType"
+                  value="individual"
+                  checked={gameType === 'individual'}
+                  onChange={(e) => setGameType(e.target.value as 'individual' | 'doubles')}
+                  className="mr-2"
+                />
+                <span className="text-black">Jogos Individuais</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="gameType"
+                  value="doubles"
+                  checked={gameType === 'doubles'}
+                  onChange={(e) => setGameType(e.target.value as 'individual' | 'doubles')}
+                  className="mr-2"
+                />
+                <span className="text-black">Jogos de Duplas</span>
+              </label>
+            </div>
           </div>
-          <button
-            onClick={generateGames}
-            disabled={loading || !selectedCategory}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Gerando...' : 'Gerar Jogos'}
-          </button>
+          
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-black mb-1">
+                Categoria
+              </label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full border rounded px-3 py-2 text-black"
+              >
+                <option value="">Selecione uma categoria</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={generateGames}
+              disabled={loading || !selectedCategory}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Gerando...' : `Gerar Jogos ${gameType === 'individual' ? 'Individuais' : 'de Duplas'}`}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Filtros */}
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-        <h3 className="text-lg font-semibold mb-4 text-blue-800">Filtros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-blue-800">Filtros</h3>
+          <button
+            onClick={() => {
+              setFilterCategory('')
+              setFilterPlayer('')
+              setFilterStatus('')
+              setFilterDateFrom('')
+              setFilterGameType('')
+            }}
+            className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors"
+          >
+            🗑️ Limpar Filtros
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-black mb-1">
               Filtrar por Categoria
@@ -379,6 +559,31 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
               <option value="finalizado">🟢 Finalizados</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Data de Início
+            </label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-black"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Tipo de Jogo
+            </label>
+            <select
+              value={filterGameType}
+              onChange={(e) => setFilterGameType(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-black"
+            >
+              <option value="">Todos os tipos</option>
+              <option value="individual">🏸 Individual</option>
+              <option value="doubles">👥 Duplas</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -413,6 +618,37 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
                   })
                 }
                 
+                if (filterDateFrom) {
+                  filteredGames = filteredGames.filter(game => {
+                    if (!game.game_date) return false
+                    return game.game_date >= filterDateFrom
+                  })
+                }
+                
+                if (filterGameType) {
+                  filteredGames = filteredGames.filter(game => {
+                    if (filterGameType === 'individual') {
+                      return !game.is_doubles
+                    } else if (filterGameType === 'doubles') {
+                      return game.is_doubles
+                    }
+                    return true
+                  })
+                }
+                
+                // Ordenar jogos: pendentes primeiro, depois finalizados
+                filteredGames = filteredGames.sort((a, b) => {
+                  const aIsPending = !a.winner_id
+                  const bIsPending = !b.winner_id
+                  
+                  // Se um é pendente e outro não, o pendente vem primeiro
+                  if (aIsPending && !bIsPending) return -1
+                  if (!aIsPending && bIsPending) return 1
+                  
+                  // Se ambos têm o mesmo status, manter ordem original (por ID)
+                  return a.id - b.id
+                })
+                
                 return filteredGames.length
               })()} jogos
             </span>
@@ -438,6 +674,37 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
               return filterStatus === 'finalizado' ? isFinished : !isFinished
             })
           }
+          
+          if (filterDateFrom) {
+            filteredGames = filteredGames.filter(game => {
+              if (!game.game_date) return false
+              return game.game_date >= filterDateFrom
+            })
+          }
+          
+          if (filterGameType) {
+            filteredGames = filteredGames.filter(game => {
+              if (filterGameType === 'individual') {
+                return !game.is_doubles
+              } else if (filterGameType === 'doubles') {
+                return game.is_doubles
+              }
+              return true
+            })
+          }
+          
+          // Ordenar jogos: pendentes primeiro, depois finalizados
+          filteredGames = filteredGames.sort((a, b) => {
+            const aIsPending = !a.winner_id
+            const bIsPending = !b.winner_id
+            
+            // Se um é pendente e outro não, o pendente vem primeiro
+            if (aIsPending && !bIsPending) return -1
+            if (!aIsPending && bIsPending) return 1
+            
+            // Se ambos têm o mesmo status, manter ordem original (por ID)
+            return a.id - b.id
+          })
           
           return filteredGames.length === 0 ? (
             <div className="text-center py-12">
@@ -515,7 +782,34 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
       return
     }
     
-    const winnerId = player1Sets > player2Sets ? game.player1_id : game.player2_id
+    // Determinar o vencedor com validação
+    let winnerId: number | undefined
+    
+    if (game.is_doubles) {
+      // Para jogos de duplas, usar team_id
+      winnerId = player1Sets > player2Sets ? game.team1_id : game.team2_id
+      
+      // Validar se os team_ids existem
+      if (!game.team1_id || !game.team2_id) {
+        alert('Erro: IDs das duplas não encontrados. Verifique se o jogo foi criado corretamente.')
+        return
+      }
+    } else {
+      // Para jogos individuais, usar player_id
+      winnerId = player1Sets > player2Sets ? game.player1_id : game.player2_id
+      
+      // Validar se os player_ids existem
+      if (!game.player1_id || !game.player2_id) {
+        alert('Erro: IDs dos jogadores não encontrados. Verifique se o jogo foi criado corretamente.')
+        return
+      }
+    }
+    
+    // Validar se o winnerId foi determinado corretamente
+    if (!winnerId) {
+      alert('Erro: Não foi possível determinar o vencedor. Verifique os dados do jogo.')
+      return
+    }
     
     const sets = {
       set1_player1: set1Player1,
@@ -559,7 +853,10 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
               <span className="text-lg">⚔️</span>
             </div>
             <h4 className="font-bold text-lg text-blue-900">
-              {game.player1?.name} vs {game.player2?.name}
+              {game.is_doubles 
+                ? `${game.team1?.name} vs ${game.team2?.name}`
+                : `${game.player1?.name} vs ${game.player2?.name}`
+              }
             </h4>
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -622,7 +919,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
                     setWinner === 'player1' ? 'bg-green-100 border border-green-300' : 'bg-gray-50'
                   }`}>
                     <span className="text-sm font-medium text-gray-700 truncate flex-1">
-                      {game.player1?.name}
+                      {game.is_doubles ? game.team1?.name : game.player1?.name}
                     </span>
                     <input
                       type="number"
@@ -647,7 +944,7 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
                     setWinner === 'player2' ? 'bg-green-100 border border-green-300' : 'bg-gray-50'
                   }`}>
                     <span className="text-sm font-medium text-gray-700 truncate flex-1">
-                      {game.player2?.name}
+                      {game.is_doubles ? game.team2?.name : game.player2?.name}
                     </span>
                     <input
                       type="number"
@@ -721,7 +1018,10 @@ function GameCard({ game, onUpdateResult, onUpdateDate, onDeleteGame, loading }:
       {game.winner_id && (
         <div className="mt-4 text-center">
           <p className="text-sm text-green-600 font-medium">
-            🏆 Vencedor: {game.winner_id === game.player1_id ? game.player1?.name : game.player2?.name}
+            🏆 Vencedor: {game.is_doubles 
+              ? (game.winner_id === game.team1_id ? game.team1?.name : game.team2?.name)
+              : (game.winner_id === game.player1_id ? game.player1?.name : game.player2?.name)
+            }
           </p>
           <p className="text-xs text-black">
             Placar total: {game.player1_score || 0} x {game.player2_score || 0}
