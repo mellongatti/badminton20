@@ -12,28 +12,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se já existem jogos para esta categoria
-    const { data: existingGames } = await supabase
-      .from('elimination_games')
-      .select('*')
-      .eq('category_id', categoryId)
-      .eq('phase', 1)
-
-    let existingParticipantIds: number[] = []
-    if (existingGames && existingGames.length > 0) {
-      // Extrair IDs dos participantes que já jogaram
-      existingGames.forEach(game => {
-        if (game.is_team_game) {
-          if (game.team1_id) existingParticipantIds.push(game.team1_id)
-          if (game.team2_id) existingParticipantIds.push(game.team2_id)
-        } else {
-          if (game.player1_id) existingParticipantIds.push(game.player1_id)
-          if (game.player2_id) existingParticipantIds.push(game.player2_id)
-        }
-      })
-    }
-
-    let participants: any[] = []
+    // Buscar todos os participantes da categoria
+    let allParticipants: any[] = []
     let isTeamGame = false
 
     if (gameType === 'individual') {
@@ -44,8 +24,7 @@ export async function POST(request: NextRequest) {
         .eq('category_id', categoryId)
 
       if (playersError) throw playersError
-      // Filtrar apenas jogadores que ainda não jogaram
-      participants = (players || []).filter(player => !existingParticipantIds.includes(player.id))
+      allParticipants = players || []
       isTeamGame = false
     } else {
       // Buscar duplas da categoria
@@ -55,90 +34,163 @@ export async function POST(request: NextRequest) {
         .eq('category_id', categoryId)
 
       if (teamsError) throw teamsError
-      // Filtrar apenas duplas que ainda não jogaram
-      participants = (teams || []).filter(team => !existingParticipantIds.includes(team.id))
+      allParticipants = teams || []
       isTeamGame = true
     }
 
-    if (participants.length === 0) {
-      if (existingParticipantIds.length > 0) {
-        return NextResponse.json(
-          { message: 'Todos os participantes já foram incluídos nos jogos da primeira fase' },
-          { status: 200 }
-        )
-      } else {
-        return NextResponse.json(
-          { error: `É necessário pelo menos 2 ${isTeamGame ? 'duplas' : 'jogadores'} na categoria` },
-          { status: 400 }
-        )
-      }
-    }
-
-    if (participants.length === 1 && existingParticipantIds.length === 0) {
+    if (allParticipants.length < 2) {
       return NextResponse.json(
         { error: `É necessário pelo menos 2 ${isTeamGame ? 'duplas' : 'jogadores'} na categoria` },
         { status: 400 }
       )
     }
 
-    // Embaralhar participantes para torneio aleatório
-    const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5)
-    
-    // Gerar jogos da primeira fase
-    const games = []
-    const totalParticipants = shuffledParticipants.length
-    
-    console.log(`🎯 Total de participantes: ${totalParticipants}`)
-    console.log('📋 Participantes:', shuffledParticipants.map(p => p.name))
-    
-    // Para torneio eliminatório simples - emparelhar novos participantes
-    if (participants.length === 1) {
-      // Se há apenas 1 novo participante, ele passa direto para a próxima fase
-      console.log(`🎪 ${shuffledParticipants[0].name} passa direto para a próxima fase (bye) - novo participante`)
-    } else {
-      // Emparelhar participantes sequencialmente
-      for (let i = 0; i < shuffledParticipants.length; i += 2) {
-        if (i + 1 < shuffledParticipants.length) {
-          const gameData: any = {
-            category_id: categoryId,
-            phase: 1,
-            is_team_game: isTeamGame,
-            status: 'pending'
-          }
+    // Verificar jogos já existentes para esta categoria e fase
+    const { data: existingGames } = await supabase
+      .from('elimination_games')
+      .select('*')
+      .eq('category_id', categoryId)
+      .eq('phase', 1)
 
-          if (isTeamGame) {
-            gameData.team1_id = shuffledParticipants[i].id
-            gameData.team2_id = shuffledParticipants[i + 1].id
-          } else {
-            gameData.player1_id = shuffledParticipants[i].id
-            gameData.player2_id = shuffledParticipants[i + 1].id
+    // Criar um Set com as combinações já existentes
+    const existingCombinations = new Set()
+    if (existingGames && existingGames.length > 0) {
+      existingGames.forEach(game => {
+        if (game.is_team_game) {
+          if (game.team1_id && game.team2_id) {
+            existingCombinations.add(`${game.team1_id}-${game.team2_id}`)
+            existingCombinations.add(`${game.team2_id}-${game.team1_id}`)
           }
-
-          games.push(gameData)
-          console.log(`⚽ Jogo criado: ${shuffledParticipants[i].name} vs ${shuffledParticipants[i + 1].name}`)
         } else {
-          // Se há número ímpar de participantes, o último passa direto para a próxima fase
-          console.log(`🎪 ${shuffledParticipants[i].name} passa direto para a próxima fase (bye)`)
+          if (game.player1_id && game.player2_id) {
+            existingCombinations.add(`${game.player1_id}-${game.player2_id}`)
+            existingCombinations.add(`${game.player2_id}-${game.player1_id}`)
+          }
         }
-      }
+      })
+    }
+
+    // Verificar se já existem jogos para esta categoria
+    if (existingGames && existingGames.length > 0) {
+      return NextResponse.json(
+        { message: 'Jogos já foram gerados para esta categoria na primeira fase!' },
+        { status: 200 }
+      )
+    }
+
+    // Embaralhar participantes para tornar o chaveamento aleatório
+    const shuffledParticipants = [...allParticipants].sort(() => Math.random() - 0.5)
+    
+    console.log(`🎯 Total de participantes: ${shuffledParticipants.length}`)
+    console.log('📋 Participantes embaralhados:', shuffledParticipants.map(p => p.name))
+    
+    // Função para calcular a próxima potência de 2
+    function getNextPowerOfTwo(n: number): number {
+      return Math.pow(2, Math.ceil(Math.log2(n)))
     }
     
-    console.log(`🎲 Total de jogos criados: ${games.length}`)
+    // Calcular número de byes necessários
+    const nextPowerOfTwo = getNextPowerOfTwo(shuffledParticipants.length)
+    const byesNeeded = nextPowerOfTwo - shuffledParticipants.length
+    
+    console.log(`📊 Análise do torneio:`)
+    console.log(`   - Participantes: ${shuffledParticipants.length}`)
+    console.log(`   - Próxima potência de 2: ${nextPowerOfTwo}`)
+    console.log(`   - Byes necessários: ${byesNeeded}`)
+    
+    // Separar participantes que receberão bye dos que jogarão na primeira fase
+    const participantsWithBye = shuffledParticipants.slice(0, byesNeeded)
+    const participantsToPlay = shuffledParticipants.slice(byesNeeded)
+    
+    console.log(`🎯 Participantes com BYE (${participantsWithBye.length}):`, participantsWithBye.map(p => p.name))
+    console.log(`⚽ Participantes que jogarão (${participantsToPlay.length}):`, participantsToPlay.map(p => p.name))
+    
+    // Gerar jogos de eliminação apenas para participantes que devem jogar na primeira fase
+    const newGames = []
+    for (let i = 0; i < participantsToPlay.length; i += 2) {
+      const participant1 = participantsToPlay[i]
+      const participant2 = participantsToPlay[i + 1]
+      
+      const gameData: any = {
+        category_id: categoryId,
+        phase: 1,
+        is_team_game: isTeamGame,
+        status: 'pending'
+      }
 
-    // Inserir jogos no banco
+      if (isTeamGame) {
+        gameData.team1_id = participant1.id
+        gameData.team2_id = participant2.id
+      } else {
+        gameData.player1_id = participant1.id
+        gameData.player2_id = participant2.id
+      }
+
+      newGames.push(gameData)
+      console.log(`⚽ Jogo de eliminação criado: ${participant1.name} vs ${participant2.name}`)
+    }
+    
+    console.log(`🎲 Total de jogos de eliminação criados: ${newGames.length}`)
+
+    // Inserir novos jogos no banco
     const { error: insertError } = await supabase
       .from('elimination_games')
-      .insert(games)
+      .insert(newGames)
 
     if (insertError) throw insertError
 
-    // Criar registro da fase apenas se não existir
-    if (existingParticipantIds.length === 0) {
+    // Criar registros de BYE para participantes que avançam automaticamente
+    const byeGames = []
+    for (const participant of participantsWithBye) {
+      const byeGameData: any = {
+        category_id: categoryId,
+        phase: 1,
+        is_team_game: isTeamGame,
+        status: 'completed', // BYE é automaticamente "vencido"
+        is_bye: true, // Marcar como BYE
+        winner_id: participant.id
+      }
+
+      if (isTeamGame) {
+        byeGameData.team1_id = participant.id
+        byeGameData.team2_id = null // Sem oponente
+      } else {
+        byeGameData.player1_id = participant.id
+        byeGameData.player2_id = null // Sem oponente
+      }
+
+      byeGames.push(byeGameData)
+      console.log(`🎯 BYE criado para: ${participant.name}`)
+    }
+
+    // Inserir registros de BYE se houver
+    if (byeGames.length > 0) {
+      const { error: byeError } = await supabase
+        .from('elimination_games')
+        .insert(byeGames)
+
+      if (byeError) {
+        console.warn('Erro ao criar registros de BYE:', byeError)
+      } else {
+        console.log(`🎯 ${byeGames.length} registros de BYE criados com sucesso`)
+      }
+    }
+
+    // Verificar se já existe uma fase para esta categoria
+    const { data: existingPhase } = await supabase
+      .from('elimination_phases')
+      .select('*')
+      .eq('category_id', categoryId)
+      .eq('phase_number', 1)
+      .single()
+
+    if (!existingPhase) {
+      // Criar registro da fase se não existir
       const phaseData = {
         category_id: categoryId,
         phase_number: 1,
         phase_name: 'Primeira Fase',
-        total_players: totalParticipants,
+        total_players: shuffledParticipants.length,
         is_active: true
       }
 
@@ -147,31 +199,19 @@ export async function POST(request: NextRequest) {
         .insert(phaseData)
 
       if (phaseError) {
-        console.warn('Erro ao criar fase (pode já existir):', phaseError)
-      }
-    } else {
-      // Atualizar o total de jogadores na fase existente
-      const { error: updateError } = await supabase
-        .from('elimination_phases')
-        .update({ total_players: totalParticipants + existingParticipantIds.length })
-        .eq('category_id', categoryId)
-        .eq('phase_number', 1)
-
-      if (updateError) {
-        console.warn('Erro ao atualizar total de jogadores na fase:', updateError)
+        console.warn('Erro ao criar fase:', phaseError)
       }
     }
 
-    const message = existingParticipantIds.length > 0 
-      ? `${games.length} novos jogos adicionados com sucesso para os novos participantes`
-      : 'Jogos gerados com sucesso'
-
     return NextResponse.json(
       { 
-        message,
-        gamesCreated: games.length,
-        newParticipants: totalParticipants,
-        existingParticipants: existingParticipantIds.length
+        message: `Torneio de eliminação criado! ${newGames.length} jogos gerados e ${byeGames.length} byes distribuídos para ${shuffledParticipants.length} participantes.`,
+        gamesCreated: newGames.length,
+        byesCreated: byeGames.length,
+        totalParticipants: shuffledParticipants.length,
+        participantsWithBye: participantsWithBye.map(p => p.name),
+        phase: 1,
+        description: 'Cada participante joga apenas uma vez. Vencedores avançam para a próxima fase.'
       },
       { status: 200 }
     )

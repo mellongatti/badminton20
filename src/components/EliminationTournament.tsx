@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import TournamentBracket from './TournamentBracket'
 
 interface EliminationGame {
   id: number
@@ -23,6 +24,7 @@ interface EliminationGame {
   set3_player2?: number
   is_team_game: boolean
   is_wo?: boolean
+  is_bye?: boolean
   status: string
   player1?: { name: string }
   player2?: { name: string }
@@ -55,9 +57,10 @@ export default function EliminationTournament({ players, categories, teams }: El
   const [selectedDate, setSelectedDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'games' | 'phases' | 'settings' | 'scheduling'>('games')
+  const [activeTab, setActiveTab] = useState<'games' | 'phases' | 'settings' | 'scheduling' | 'podium' | 'bracket'>('games')
   const [selectedGames, setSelectedGames] = useState<Set<number>>(new Set())
   const [schedulingDate, setSchedulingDate] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'bracket'>('list')
 
   useEffect(() => {
     fetchGames()
@@ -150,6 +153,88 @@ export default function EliminationTournament({ players, categories, teams }: El
     }
   }
 
+  const generateNextPhase = async (phaseToAdvance?: number) => {
+    if (!selectedCategory) {
+      alert('Por favor, selecione uma categoria')
+      return
+    }
+    
+    const targetPhase = phaseToAdvance || currentPhase
+    
+    // Buscar jogos da categoria e fase atual selecionada pelo usuário
+    const categoryGames = games.filter(game => game.category_id.toString() === selectedCategory)
+    const currentPhaseGames = categoryGames.filter(game => game.phase === targetPhase)
+    
+    console.log('🔍 Debug generateNextPhase:')
+    console.log('   - Categoria selecionada:', selectedCategory)
+    console.log('   - Fase selecionada pelo usuário:', currentPhase)
+    console.log('   - Total de jogos da categoria:', categoryGames.length)
+    console.log('   - Jogos da fase atual:', currentPhaseGames.length)
+    console.log('   - Jogos da fase atual:', currentPhaseGames.map(g => ({ id: g.id, status: g.status, winner_id: g.winner_id })))
+    
+    // Verificar se há pelo menos 1 jogo finalizado (com vencedor)
+    const finishedGames = currentPhaseGames.filter(game => game.status === 'completed' && game.winner_id)
+    console.log('   - Jogos finalizados com vencedor:', finishedGames.length)
+    
+    if (finishedGames.length === 0) {
+      alert('É necessário pelo menos 1 jogo finalizado para gerar a próxima fase.')
+      return
+    }
+    
+    if (currentPhaseGames.length === 0) {
+      alert('Não há jogos na fase atual para avançar.')
+      return
+    }
+    
+    // Confirmar ação
+    const winners = finishedGames.length
+    if (!confirm(`Gerar próxima fase com ${winners} vencedor(es) disponível(is)?`)) {
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const response = await fetch('/api/elimination/advance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          categoryId: selectedCategory,
+          currentPhase: targetPhase
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        alert(data.message)
+        await fetchGames()
+        await fetchPhases()
+        
+        // Atualizar currentPhase para a fase ativa da categoria selecionada
+        const { data: updatedPhases } = await supabase
+          .from('elimination_phases')
+          .select('*')
+          .eq('category_id', selectedCategory)
+          .eq('is_active', true)
+          .single()
+        
+        if (updatedPhases) {
+          setCurrentPhase(updatedPhases.phase_number)
+          console.log(`🔄 Fase atual atualizada para: ${updatedPhases.phase_number} (${updatedPhases.phase_name})`)
+        }
+      } else {
+        alert(`Erro ao gerar próxima fase: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Erro ao gerar próxima fase:', error)
+      alert('Erro ao gerar próxima fase')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const deleteGame = async (gameId: number) => {
     if (!confirm('Tem certeza que deseja excluir este jogo?')) return
 
@@ -216,6 +301,27 @@ export default function EliminationTournament({ players, categories, teams }: El
     }
     return true
   })
+
+  // Debug: Mostrar informações sobre jogos e fases
+  React.useEffect(() => {
+    if (selectedCategory) {
+      const categoryGames = games.filter(g => g.category_id.toString() === selectedCategory)
+      const categoryPhases = phases.filter(p => p.category_id.toString() === selectedCategory)
+      const activePhase = categoryPhases.find(p => p.is_active)
+      
+      console.log('🔍 Debug Filtros:')
+      console.log('   - Categoria selecionada:', selectedCategory)
+      console.log('   - Fase atual (filtro):', currentPhase)
+      console.log('   - Fase ativa (banco):', activePhase?.phase_number, activePhase?.phase_name)
+      console.log('   - Total de jogos da categoria:', categoryGames.length)
+      console.log('   - Jogos por fase:', categoryGames.reduce((acc, game) => {
+        acc[game.phase] = (acc[game.phase] || 0) + 1
+        return acc
+      }, {} as Record<number, number>))
+      console.log('   - Jogos filtrados exibidos:', filteredGames.length)
+      console.log('   - Fases da categoria:', categoryPhases.map(p => `Fase ${p.phase_number} (${p.phase_name}) - Ativa: ${p.is_active}`))
+    }
+  }, [selectedCategory, currentPhase, games, phases, filteredGames.length])
 
   const togglePhaseExpansion = (categoryId: number, phase: number) => {
     const phaseKey = `${categoryId}-${phase}`
@@ -310,6 +416,17 @@ export default function EliminationTournament({ players, categories, teams }: El
               <span className="text-sm">Jogos</span>
             </button>
             <button
+              onClick={() => setActiveTab('scheduling')}
+              className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+                activeTab === 'scheduling'
+                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md transform scale-105'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/50'
+              }`}
+            >
+              <span className="text-lg">📅</span>
+              <span className="text-sm">Agendamento</span>
+            </button>
+            <button
               onClick={() => setActiveTab('phases')}
               className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
                 activeTab === 'phases'
@@ -321,15 +438,26 @@ export default function EliminationTournament({ players, categories, teams }: El
               <span className="text-sm">Tabela de Fases</span>
             </button>
             <button
-              onClick={() => setActiveTab('scheduling')}
+              onClick={() => setActiveTab('podium')}
               className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
-                activeTab === 'scheduling'
-                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md transform scale-105'
+                activeTab === 'podium'
+                  ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-md transform scale-105'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/50'
               }`}
             >
-              <span className="text-lg">📅</span>
-              <span className="text-sm">Agendamento</span>
+              <span className="text-lg">🏆</span>
+              <span className="text-sm">Podium</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('bracket')}
+              className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+                activeTab === 'bracket'
+                  ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md transform scale-105'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/50'
+              }`}
+            >
+              <span className="text-lg">🏆</span>
+              <span className="text-sm">Chaveamento</span>
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -402,7 +530,7 @@ export default function EliminationTournament({ players, categories, teams }: El
                     onChange={(e) => setCurrentPhase(parseInt(e.target.value))}
                     className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/50 text-sm"
                   >
-                    {[1, 2, 3, 4, 5].map((phase) => (
+                    {Array.from({length: 30}, (_, i) => i + 1).map((phase) => (
                       <option key={phase} value={phase}>
                         Fase {phase}
                       </option>
@@ -424,7 +552,7 @@ export default function EliminationTournament({ players, categories, teams }: El
                 </div>
               </div>
 
-              <div className="flex justify-center gap-3">
+              <div className="flex justify-center gap-3 mb-4">
                 <button
                   onClick={generateGames}
                   disabled={loading || !selectedCategory}
@@ -455,6 +583,71 @@ export default function EliminationTournament({ players, categories, teams }: El
                   <span className="text-sm">🧹</span>
                   <span>Limpar Filtros</span>
                 </button>
+              </div>
+              
+              {/* Controle de Fases Individuais */}
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <h4 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                  <span className="text-lg">⏭️</span>
+                  Controle de Fases
+                </h4>
+                <p className="text-blue-700 mb-3 text-xs">
+                  Gere a próxima fase com base nos vencedores de cada fase. Cada fase tem seu próprio botão de geração.
+                </p>
+                
+                {selectedCategory && (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {Array.from({length: 30}, (_, i) => i + 1).map((phaseNumber) => {
+                      // Verificar se há jogos nesta fase
+                      const phaseGames = games.filter(game => 
+                        game.category_id.toString() === selectedCategory && 
+                        game.phase === phaseNumber
+                      )
+                      
+                      // Verificar se há jogos finalizados com vencedores
+                      const finishedGames = phaseGames.filter(game => 
+                        game.status === 'completed' && game.winner_id
+                      )
+                      
+                      // Verificar se já existe a próxima fase
+                      const nextPhaseExists = games.some(game => 
+                        game.category_id.toString() === selectedCategory && 
+                        game.phase === phaseNumber + 1
+                      )
+                      
+                      // Só mostrar se há jogos nesta fase ou se é a fase 1
+                      if (phaseGames.length === 0 && phaseNumber > 1) return null
+                      
+                      return (
+                        <div key={phaseNumber} className="flex items-center justify-between bg-white p-2 rounded border">
+                          <div className="flex-1">
+                            <span className="text-xs font-medium text-gray-700">
+                              Fase {phaseNumber}
+                            </span>
+                            <div className="text-xs text-gray-500">
+                              {phaseGames.length} jogos • {finishedGames.length} finalizados
+                            </div>
+                          </div>
+                          
+                          <button
+                             onClick={() => generateNextPhase(phaseNumber)}
+                             disabled={loading || finishedGames.length === 0 || (phaseNumber >= 30)}
+                             className="px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded text-xs font-medium hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-1"
+                           >
+                             <span className="text-xs">🎯</span>
+                             <span>Gerar Fase {phaseNumber + 1}</span>
+                           </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                
+                {!selectedCategory && (
+                  <div className="text-center py-4 text-gray-500 text-xs">
+                    Selecione uma categoria para ver as fases disponíveis
+                  </div>
+                )}
               </div>
             </div>
 
@@ -490,6 +683,182 @@ export default function EliminationTournament({ players, categories, teams }: El
           </>
         )}
 
+        {/* Conteúdo da Aba Chaveamento */}
+        {activeTab === 'bracket' && (
+          <TournamentBracket 
+            selectedCategory={selectedCategory}
+            categories={categories}
+          />
+        )}
+
+        {/* Conteúdo da Aba Podium */}
+        {activeTab === 'podium' && (
+          <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-white/20">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-lg">🏆</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Pódio do Torneio</h3>
+            </div>
+            
+            {/* Filtro por categoria */}
+            <div className="mb-6">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <span className="text-lg">🏷️</span>
+                  Filtrar por Categoria
+                </label>
+                <select
+                  value={selectedCategory || ''}
+                  onChange={(e) => setSelectedCategory(e.target.value || null)}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all duration-200 bg-white"
+                >
+                  <option value="">Todas as categorias</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Pódio por categoria */}
+            <div className="space-y-6">
+              {categories
+                .filter(category => !selectedCategory || category.id.toString() === selectedCategory)
+                .map(category => {
+                  // Buscar jogos finalizados da categoria
+                  const categoryGames = games.filter(game => 
+                    game.category_id === category.id && 
+                    game.status === 'finished' && 
+                    game.winner_id
+                  );
+                  
+                  if (categoryGames.length === 0) {
+                    return (
+                      <div key={category.id} className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-200">
+                        <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <span className="text-xl">🏷️</span>
+                          {category.name}
+                        </h4>
+                        <div className="text-center py-8">
+                          <div className="text-4xl mb-2">🏆</div>
+                          <p className="text-gray-600">Nenhum jogo finalizado ainda</p>
+                          <p className="text-sm text-gray-500 mt-1">Complete os jogos para ver o pódio</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Determinar vencedores por fase (assumindo que a fase mais alta é a final)
+                  const maxPhase = Math.max(...categoryGames.map(game => game.phase));
+                  const finalGame = categoryGames.find(game => game.phase === maxPhase);
+                  const semifinalGames = categoryGames.filter(game => game.phase === maxPhase - 1);
+                  
+                  let winner = null;
+                  let runnerUp = null;
+                  let thirdPlace = [];
+                  
+                  if (finalGame && finalGame.winner_id) {
+                    // Vencedor (1º lugar)
+                    if (finalGame.is_team_game) {
+                      winner = finalGame.winner_id === finalGame.team1_id ? finalGame.team1 : finalGame.team2;
+                      runnerUp = finalGame.winner_id === finalGame.team1_id ? finalGame.team2 : finalGame.team1;
+                    } else {
+                      winner = finalGame.winner_id === finalGame.player1_id ? finalGame.player1 : finalGame.player2;
+                      runnerUp = finalGame.winner_id === finalGame.player1_id ? finalGame.player2 : finalGame.player1;
+                    }
+                    
+                    // 3º lugar (perdedores das semifinais)
+                    semifinalGames.forEach(game => {
+                      if (game.winner_id) {
+                        const loser = game.is_team_game 
+                          ? (game.winner_id === game.team1_id ? game.team2 : game.team1)
+                          : (game.winner_id === game.player1_id ? game.player2 : game.player1);
+                        if (loser) thirdPlace.push(loser);
+                      }
+                    });
+                  }
+                  
+                  return (
+                    <div key={category.id} className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-xl border border-yellow-200">
+                      <h4 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-xl">🏷️</span>
+                        {category.name}
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* 1º Lugar */}
+                        <div className="text-center">
+                          <div className="bg-gradient-to-b from-yellow-400 to-yellow-600 p-6 rounded-xl shadow-lg mb-3">
+                            <div className="text-4xl mb-2">🥇</div>
+                            <div className="text-white font-bold text-lg">1º Lugar</div>
+                          </div>
+                          {winner ? (
+                            <div className="bg-white p-3 rounded-lg shadow-sm border">
+                              <p className="font-bold text-gray-800">{winner.name}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 p-3 rounded-lg">
+                              <p className="text-gray-500">A definir</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 2º Lugar */}
+                        <div className="text-center">
+                          <div className="bg-gradient-to-b from-gray-300 to-gray-500 p-6 rounded-xl shadow-lg mb-3">
+                            <div className="text-4xl mb-2">🥈</div>
+                            <div className="text-white font-bold text-lg">2º Lugar</div>
+                          </div>
+                          {runnerUp ? (
+                            <div className="bg-white p-3 rounded-lg shadow-sm border">
+                              <p className="font-bold text-gray-800">{runnerUp.name}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 p-3 rounded-lg">
+                              <p className="text-gray-500">A definir</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 3º Lugar */}
+                        <div className="text-center">
+                          <div className="bg-gradient-to-b from-amber-600 to-amber-800 p-6 rounded-xl shadow-lg mb-3">
+                            <div className="text-4xl mb-2">🥉</div>
+                            <div className="text-white font-bold text-lg">3º Lugar</div>
+                          </div>
+                          {thirdPlace.length > 0 ? (
+                            <div className="space-y-2">
+                              {thirdPlace.map((player, index) => (
+                                <div key={index} className="bg-white p-2 rounded-lg shadow-sm border">
+                                  <p className="font-bold text-gray-800 text-sm">{player.name}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 p-3 rounded-lg">
+                              <p className="text-gray-500">A definir</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              
+              {categories.filter(category => !selectedCategory || category.id.toString() === selectedCategory).length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🏆</div>
+                  <p className="text-xl text-gray-600 font-medium">Nenhuma categoria encontrada</p>
+                  <p className="text-gray-500 mt-2">Selecione uma categoria para ver o pódio</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Conteúdo da Aba Configurações */}
         {activeTab === 'settings' && (
           <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-white/20">
@@ -518,6 +887,8 @@ export default function EliminationTournament({ players, categories, teams }: El
                   <span>Deletar Todos os Jogos da Categoria</span>
                 </button>
               </div>
+              
+
             </div>
           </div>
         )}
@@ -862,6 +1233,59 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
     if (isTeam && team) return team.name
     if (!isTeam && player) return player.name
     return 'TBD'
+  }
+
+  // Se for um jogo BYE, renderizar interface especial
+  if (game.is_bye) {
+    return (
+      <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-3 rounded-xl shadow-md border border-yellow-200 hover:shadow-lg transition-all duration-300">
+        {/* Header do Card BYE */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-md flex items-center justify-center">
+              <span className="text-white text-xs font-bold">F{game.phase}</span>
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm text-gray-900">{game.category?.name}</h4>
+              <p className="text-xs text-gray-600">
+                {game.is_team_game ? '👥 Dupla' : '👤 Individual'} • 
+                <span className="font-semibold text-green-600">BYE</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onDeleteGame(game.id)}
+            className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+            title="Excluir jogo"
+          >
+            🗑️
+          </button>
+        </div>
+
+        {/* Conteúdo do BYE */}
+        <div className="bg-gradient-to-r from-yellow-100 to-amber-100 p-3 rounded-lg border border-yellow-300">
+          <div className="text-center">
+            <div className="text-2xl mb-2">🎯</div>
+            <h3 className="font-bold text-lg text-gray-900 mb-1">BYE</h3>
+            <p className="text-sm text-gray-700 mb-2">
+              {getPlayerName(game.is_team_game, game.player1, game.team1)} avança automaticamente
+            </p>
+            <div className="bg-yellow-200 px-3 py-1 rounded-full inline-block">
+              <span className="text-xs font-semibold text-yellow-800">Classificado para a próxima fase</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Data do jogo (se houver) */}
+        {game.game_date && (
+          <div className="mt-2 text-center">
+            <p className="text-xs text-gray-600">
+              📅 {new Date(game.game_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
