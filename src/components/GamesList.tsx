@@ -392,9 +392,12 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
   const updateGameDate = async (gameId: number, date: string) => {
     setLoading(true)
     try {
+      // Formatar a data corretamente para evitar problemas de fuso horário
+      const formattedDate = date ? new Date(date + 'T12:00:00').toISOString().split('T')[0] : null
+      
       const { error } = await supabase
         .from('games')
-        .update({ game_date: date })
+        .update({ game_date: formattedDate })
         .eq('id', gameId)
 
       if (error) {

@@ -52,9 +52,12 @@ export default function EliminationTournament({ players, categories, teams }: El
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedGameType, setSelectedGameType] = useState('individual')
   const [currentPhase, setCurrentPhase] = useState(1)
+  const [selectedDate, setSelectedDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'games' | 'phases' | 'settings'>('games')
+  const [activeTab, setActiveTab] = useState<'games' | 'phases' | 'settings' | 'scheduling'>('games')
+  const [selectedGames, setSelectedGames] = useState<Set<number>>(new Set())
+  const [schedulingDate, setSchedulingDate] = useState('')
 
   useEffect(() => {
     fetchGames()
@@ -205,6 +208,7 @@ export default function EliminationTournament({ players, categories, teams }: El
   const filteredGames = games.filter(game => {
     if (selectedCategory && game.category_id.toString() !== selectedCategory) return false
     if (currentPhase && game.phase !== currentPhase) return false
+    if (selectedDate && game.game_date !== selectedDate) return false
     return true
   })
 
@@ -217,6 +221,64 @@ export default function EliminationTournament({ players, categories, teams }: El
       newExpanded.add(phaseKey)
     }
     setExpandedPhases(newExpanded)
+  }
+
+  const toggleGameSelection = (gameId: number) => {
+    const newSelected = new Set(selectedGames)
+    if (newSelected.has(gameId)) {
+      newSelected.delete(gameId)
+    } else {
+      newSelected.add(gameId)
+    }
+    setSelectedGames(newSelected)
+  }
+
+  const selectAllGames = () => {
+    const allGameIds = new Set(games.map(game => game.id))
+    setSelectedGames(allGameIds)
+  }
+
+  const deselectAllGames = () => {
+    setSelectedGames(new Set())
+  }
+
+  const scheduleSelectedGames = async () => {
+    if (selectedGames.size === 0) {
+      alert('Por favor, selecione pelo menos um jogo para agendar.')
+      return
+    }
+
+    if (!schedulingDate) {
+      alert('Por favor, selecione uma data para o agendamento.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const gameIds = Array.from(selectedGames)
+      
+      // Formatar a data corretamente para evitar problemas de fuso horário
+      const formattedDate = new Date(schedulingDate + 'T12:00:00').toISOString().split('T')[0]
+      
+      for (const gameId of gameIds) {
+        const { error } = await supabase
+          .from('elimination_games')
+          .update({ game_date: formattedDate })
+          .eq('id', gameId)
+
+        if (error) throw error
+      }
+
+      alert(`${gameIds.length} jogo(s) agendado(s) com sucesso para ${new Date(schedulingDate + 'T12:00:00').toLocaleDateString('pt-BR')}!`)
+      setSelectedGames(new Set())
+      setSchedulingDate('')
+      fetchGames() // Recarregar jogos para mostrar as datas atualizadas
+    } catch (error) {
+      console.error('Erro ao agendar jogos:', error)
+      alert('Erro ao agendar jogos')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -254,6 +316,17 @@ export default function EliminationTournament({ players, categories, teams }: El
               <span className="text-sm">Tabela de Fases</span>
             </button>
             <button
+              onClick={() => setActiveTab('scheduling')}
+              className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+                activeTab === 'scheduling'
+                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-md transform scale-105'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/50'
+              }`}
+            >
+              <span className="text-lg">📅</span>
+              <span className="text-sm">Agendamento</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
                 activeTab === 'settings'
@@ -279,7 +352,7 @@ export default function EliminationTournament({ players, categories, teams }: El
                 <h2 className="text-xl font-bold text-gray-900">Configurações do Torneio</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div className="space-y-1">
                   <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
                     <span className="text-sm">🏷️</span>
@@ -330,6 +403,19 @@ export default function EliminationTournament({ players, categories, teams }: El
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                    <span className="text-sm">📅</span>
+                    Data do Jogo
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/50 text-sm"
+                  />
                 </div>
               </div>
 
@@ -531,6 +617,137 @@ export default function EliminationTournament({ players, categories, teams }: El
             </div>
           </div>
         )}
+
+        {/* Conteúdo da Aba Agendamento */}
+        {activeTab === 'scheduling' && (
+          <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-md border border-white/20">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 bg-gradient-to-r from-orange-500 to-red-600 rounded-md flex items-center justify-center">
+                <span className="text-white text-sm">📅</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Agendamento de Jogos</h3>
+            </div>
+            
+            {/* Controles de Agendamento */}
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 p-3 rounded-lg mb-4 border border-orange-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    📅 Data para Agendamento
+                  </label>
+                  <input
+                    type="date"
+                    value={schedulingDate}
+                    onChange={(e) => setSchedulingDate(e.target.value)}
+                    className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 bg-white text-sm"
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAllGames}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-3 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1 text-xs"
+                  >
+                    <span>✅</span>
+                    <span>Selecionar Todos</span>
+                  </button>
+                  <button
+                    onClick={deselectAllGames}
+                    className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-2 px-3 rounded-lg font-medium hover:from-gray-600 hover:to-gray-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1 text-xs"
+                  >
+                    <span>❌</span>
+                    <span>Limpar Seleção</span>
+                  </button>
+                </div>
+                
+                <button
+                  onClick={scheduleSelectedGames}
+                  disabled={loading || selectedGames.size === 0 || !schedulingDate}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white py-2 px-3 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1 text-xs"
+                >
+                  <span>📅</span>
+                  <span>Agendar Selecionados ({selectedGames.size})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Jogos para Agendamento */}
+            <div className="space-y-3">
+              {games.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-3">🎮</div>
+                  <p className="text-base text-gray-600 font-medium">Nenhum jogo encontrado</p>
+                  <p className="text-gray-500 mt-1 text-sm">Gere jogos na aba Configurações para começar</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {games.map((game) => (
+                    <div
+                      key={game.id}
+                      className={`bg-gradient-to-br from-white to-gray-50 p-3 rounded-lg shadow-sm border transition-all duration-300 cursor-pointer hover:shadow-md ${
+                        selectedGames.has(game.id)
+                          ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-red-50'
+                          : 'border-gray-200 hover:border-orange-300'
+                      }`}
+                      onClick={() => toggleGameSelection(game.id)}
+                    >
+                      {/* Checkbox de Seleção */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1">
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                            selectedGames.has(game.id)
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'border-gray-300'
+                          }`}>
+                            {selectedGames.has(game.id) && <span className="text-xs">✓</span>}
+                          </div>
+                          <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">F{game.phase}</span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          game.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                        }`}>
+                          {game.status === 'completed' ? '✅' : '⏳'}
+                        </span>
+                      </div>
+
+                      {/* Informações do Jogo */}
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-gray-900 truncate">{game.category?.name}</p>
+                        <p className="text-xs text-gray-600">
+                          {game.is_team_game ? '👥 Dupla' : '👤 Individual'}
+                        </p>
+                        
+                        {/* Jogadores/Times */}
+                        <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-2 rounded">
+                          <div className="text-center">
+                            <p className="text-xs font-medium text-gray-900 truncate">
+                              {game.is_team_game && game.team1 ? game.team1.name : game.player1?.name || 'TBD'}
+                            </p>
+                            <div className="text-xs text-purple-600 font-bold">VS</div>
+                            <p className="text-xs font-medium text-gray-900 truncate">
+                              {game.is_team_game && game.team2 ? game.team2.name : game.player2?.name || 'TBD'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Data Atual */}
+                        {game.game_date && (
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-1 rounded border border-green-200">
+                            <p className="text-xs text-green-800 font-medium text-center">
+                              📅 {new Date(game.game_date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -552,6 +769,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
     { player1: '', player2: '' },
     { player1: '', player2: '' }
   ])
+  const [gameDate, setGameDate] = useState(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
 
   const handleSaveResult = () => {
     if (isWalkOver) {
@@ -565,21 +783,29 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
         ? (game.is_team_game ? game.team1_id : game.player1_id)
         : (game.is_team_game ? game.team2_id : game.player2_id)
       
+      // Formatar a data corretamente para evitar problemas de fuso horário
+      const formattedDate = gameDate ? new Date(gameDate + 'T12:00:00').toISOString().split('T')[0] : null
+      
       onUpdateResult(game.id, {
         status: 'completed',
         is_wo: true,
         player1_score: woWinner === 'player1' ? 1 : 0,
         player2_score: woWinner === 'player2' ? 1 : 0,
-        winner_id: winnerId
+        winner_id: winnerId,
+        game_date: formattedDate
       })
     } else {
       // Calcular vencedor baseado nos sets
       let player1Wins = 0
       let player2Wins = 0
       
+      // Formatar a data corretamente para evitar problemas de fuso horário
+      const formattedDate = gameDate ? new Date(gameDate + 'T12:00:00').toISOString().split('T')[0] : null
+      
       const resultData: any = {
         status: 'completed',
-        is_wo: false
+        is_wo: false,
+        game_date: formattedDate
       }
 
       sets.forEach((set, index) => {
@@ -611,6 +837,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
     setSets([{ player1: '', player2: '' }, { player1: '', player2: '' }, { player1: '', player2: '' }])
     setIsWalkOver(false)
     setWoWinner(null)
+    setGameDate('')
   }
 
   const getPlayerName = (isTeam: boolean, player?: any, team?: any) => {
@@ -637,6 +864,11 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
                 {game.status === 'completed' ? '✅ Concluído' : '⏳ Pendente'}
               </span>
             </p>
+            {game.game_date && (
+              <p className="text-xs text-gray-600">
+                <span className="font-semibold">📅 Data:</span> {new Date(game.game_date).toLocaleDateString('pt-BR')}
+              </p>
+            )}
           </div>
         </div>
         
@@ -801,6 +1033,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
                 ]
                 setSets(existingSets)
               }
+              setGameDate(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
               setShowResultForm(true)
             }}
             disabled={loading}
@@ -828,6 +1061,19 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">📊</span>
             <h5 className="text-sm font-bold text-gray-900">Inserir Resultado</h5>
+          </div>
+          
+          {/* Campo de Data */}
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              📅 Data do Jogo
+            </label>
+            <input
+              type="date"
+              value={gameDate}
+              onChange={(e) => setGameDate(e.target.value)}
+              className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
           </div>
           
           {/* Opção Walk Over */}
@@ -956,6 +1202,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
                 setIsWalkOver(false)
                 setWoWinner(null)
                 setSets([{ player1: '', player2: '' }, { player1: '', player2: '' }, { player1: '', player2: '' }])
+                setGameDate(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
               }}
               className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-2 px-3 rounded-lg font-bold hover:from-gray-600 hover:to-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center justify-center gap-2 text-sm"
             >
