@@ -208,7 +208,12 @@ export default function EliminationTournament({ players, categories, teams }: El
   const filteredGames = games.filter(game => {
     if (selectedCategory && game.category_id.toString() !== selectedCategory) return false
     if (currentPhase && game.phase !== currentPhase) return false
-    if (selectedDate && game.game_date !== selectedDate) return false
+    if (selectedDate && game.game_date) {
+      // Normalizar as datas para comparação (remover horário se existir)
+      const gameDate = game.game_date.split('T')[0]
+      const filterDate = selectedDate.split('T')[0]
+      if (gameDate !== filterDate) return false
+    }
     return true
   })
 
@@ -257,8 +262,8 @@ export default function EliminationTournament({ players, categories, teams }: El
     try {
       const gameIds = Array.from(selectedGames)
       
-      // Formatar a data corretamente para evitar problemas de fuso horário
-      const formattedDate = new Date(schedulingDate + 'T12:00:00').toISOString().split('T')[0]
+      // Usar a data diretamente sem conversão para evitar problemas de fuso horário
+      const formattedDate = schedulingDate
       
       for (const gameId of gameIds) {
         const { error } = await supabase
@@ -269,7 +274,7 @@ export default function EliminationTournament({ players, categories, teams }: El
         if (error) throw error
       }
 
-      alert(`${gameIds.length} jogo(s) agendado(s) com sucesso para ${new Date(schedulingDate + 'T12:00:00').toLocaleDateString('pt-BR')}!`)
+      alert(`${gameIds.length} jogo(s) agendado(s) com sucesso para ${new Date(schedulingDate + 'T00:00:00').toLocaleDateString('pt-BR')}!`)
       setSelectedGames(new Set())
       setSchedulingDate('')
       fetchGames() // Recarregar jogos para mostrar as datas atualizadas
@@ -419,7 +424,7 @@ export default function EliminationTournament({ players, categories, teams }: El
                 </div>
               </div>
 
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-3">
                 <button
                   onClick={generateGames}
                   disabled={loading || !selectedCategory}
@@ -436,6 +441,19 @@ export default function EliminationTournament({ players, categories, teams }: El
                       <span>Gerar Jogos</span>
                     </>
                   )}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setSelectedCategory('')
+                    setSelectedGameType('individual')
+                    setCurrentPhase(1)
+                    setSelectedDate('')
+                  }}
+                  className="w-32 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-1 px-2 rounded-md font-medium text-xs hover:from-gray-600 hover:to-gray-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1"
+                >
+                  <span className="text-sm">🧹</span>
+                  <span>Limpar Filtros</span>
                 </button>
               </div>
             </div>
@@ -736,7 +754,7 @@ export default function EliminationTournament({ players, categories, teams }: El
                         {game.game_date && (
                           <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-1 rounded border border-green-200">
                             <p className="text-xs text-green-800 font-medium text-center">
-                              📅 {new Date(game.game_date).toLocaleDateString('pt-BR')}
+                              📅 {new Date(game.game_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                         )}
@@ -769,7 +787,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
     { player1: '', player2: '' },
     { player1: '', player2: '' }
   ])
-  const [gameDate, setGameDate] = useState(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
+  const [gameDate, setGameDate] = useState(game.game_date || '')
 
   const handleSaveResult = () => {
     if (isWalkOver) {
@@ -784,7 +802,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
         : (game.is_team_game ? game.team2_id : game.player2_id)
       
       // Formatar a data corretamente para evitar problemas de fuso horário
-      const formattedDate = gameDate ? new Date(gameDate + 'T12:00:00').toISOString().split('T')[0] : null
+      const formattedDate = gameDate || null
       
       onUpdateResult(game.id, {
         status: 'completed',
@@ -800,7 +818,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
       let player2Wins = 0
       
       // Formatar a data corretamente para evitar problemas de fuso horário
-      const formattedDate = gameDate ? new Date(gameDate + 'T12:00:00').toISOString().split('T')[0] : null
+      const formattedDate = gameDate || null
       
       const resultData: any = {
         status: 'completed',
@@ -866,7 +884,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
             </p>
             {game.game_date && (
               <p className="text-xs text-gray-600">
-                <span className="font-semibold">📅 Data:</span> {new Date(game.game_date).toLocaleDateString('pt-BR')}
+                <span className="font-semibold">📅 Data:</span> {new Date(game.game_date + 'T00:00:00').toLocaleDateString('pt-BR')}
               </p>
             )}
           </div>
@@ -1033,7 +1051,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
                 ]
                 setSets(existingSets)
               }
-              setGameDate(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
+              setGameDate(game.game_date || '')
               setShowResultForm(true)
             }}
             disabled={loading}
@@ -1063,18 +1081,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
             <h5 className="text-sm font-bold text-gray-900">Inserir Resultado</h5>
           </div>
           
-          {/* Campo de Data */}
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              📅 Data do Jogo
-            </label>
-            <input
-              type="date"
-              value={gameDate}
-              onChange={(e) => setGameDate(e.target.value)}
-              className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-            />
-          </div>
+
           
           {/* Opção Walk Over */}
           <div className="mb-4">
@@ -1202,7 +1209,7 @@ function EliminationGameCard({ game, onUpdateResult, onDeleteGame, loading }: El
                 setIsWalkOver(false)
                 setWoWinner(null)
                 setSets([{ player1: '', player2: '' }, { player1: '', player2: '' }, { player1: '', player2: '' }])
-                setGameDate(game.game_date ? new Date(game.game_date).toISOString().split('T')[0] : '')
+                setGameDate(game.game_date || '')
               }}
               className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-2 px-3 rounded-lg font-bold hover:from-gray-600 hover:to-gray-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center justify-center gap-2 text-sm"
             >

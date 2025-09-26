@@ -392,8 +392,8 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
   const updateGameDate = async (gameId: number, date: string) => {
     setLoading(true)
     try {
-      // Formatar a data corretamente para evitar problemas de fuso horário
-      const formattedDate = date ? new Date(date + 'T12:00:00').toISOString().split('T')[0] : null
+      // Usar a data diretamente sem conversão para evitar problemas de fuso horário
+      const formattedDate = date || null
       
       const { error } = await supabase
         .from('games')
@@ -577,14 +577,34 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
           </div>
           <div>
             <label className="block text-sm font-medium text-black mb-1">
-              Data de Início
+              Data do Jogo
             </label>
-            <input
-              type="date"
+            <select
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
               className="w-full border rounded px-3 py-2 text-black"
-            />
+            >
+              <option value="">Todas as datas</option>
+              {(() => {
+                // Extrair datas únicas dos jogos cadastrados
+                const uniqueDates = Array.from(new Set(
+                  games
+                    .filter(game => game.game_date)
+                    .map(game => game.game_date)
+                    .sort()
+                ))
+                
+                return uniqueDates.map(date => {
+                  // Formatar a data para exibição
+                  const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')
+                  return (
+                    <option key={date} value={date}>
+                      {formattedDate}
+                    </option>
+                  )
+                })
+              })()} 
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-black mb-1">
@@ -638,7 +658,10 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
                 if (filterDateFrom) {
                   filteredGames = filteredGames.filter(game => {
                     if (!game.game_date) return false
-                    return game.game_date >= filterDateFrom
+                    // Normalizar ambas as datas para comparação
+                    const gameDate = game.game_date.split('T')[0] // Remove hora se existir
+                    const filterDate = filterDateFrom.split('T')[0] // Remove hora se existir
+                    return gameDate === filterDate
                   })
                 }
                 
@@ -711,7 +734,10 @@ export default function GamesList({ games, players, categories, onGamesUpdated, 
           if (filterDateFrom) {
             filteredGames = filteredGames.filter(game => {
               if (!game.game_date) return false
-              return game.game_date >= filterDateFrom
+              // Normalizar ambas as datas para comparação
+              const gameDate = game.game_date.split('T')[0] // Remove hora se existir
+              const filterDate = filterDateFrom.split('T')[0] // Remove hora se existir
+              return gameDate === filterDate
             })
           }
           

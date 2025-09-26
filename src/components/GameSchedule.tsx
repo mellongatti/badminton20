@@ -120,12 +120,10 @@ export default function GameSchedule({ games, categories, onGamesUpdated }: Game
   const handleDateChange = async (gameId: number, newDate: string) => {
     setLoading(true)
     try {
-      // Adicionar horário para evitar problemas de fuso horário
-      const dateWithTime = newDate + 'T12:00:00'
-      
+      // Usar a data diretamente sem conversão para evitar problemas de fuso horário
       const { error } = await supabase
         .from('games')
-        .update({ game_date: dateWithTime })
+        .update({ game_date: newDate })
         .eq('id', gameId)
 
       if (error) {
