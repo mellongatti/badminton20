@@ -10,13 +10,16 @@ import GamesList from '@/components/GamesList'
 import GameSchedule from '@/components/GameSchedule'
 import Standings from '@/components/Standings'
 import Login from '@/components/Login'
+import EliminationTournament from '@/components/EliminationTournament'
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState('players')
+  const [activeSubTab, setActiveSubTab] = useState('games')
   const [players, setPlayers] = useState([])
   const [categories, setCategories] = useState([])
   const [games, setGames] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
 
   const fetchPlayers = async () => {
     const { data, error } = await supabase
@@ -62,6 +65,9 @@ export default function Home() {
   const handleLogin = (success: boolean) => {
     if (success) {
       setIsAuthenticated(true)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('badminton_auth', 'true')
+      }
       // Carregar dados após login bem-sucedido
       fetchCategories()
       fetchPlayers()
@@ -71,8 +77,22 @@ export default function Home() {
 
   const handleLogout = () => {
     setIsAuthenticated(false)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('badminton_auth')
+    }
     setActiveTab('players')
   }
+
+  useEffect(() => {
+    // Verificar se já está autenticado no localStorage
+    if (typeof window !== 'undefined') {
+      const savedAuth = localStorage.getItem('badminton_auth')
+      if (savedAuth === 'true') {
+        setIsAuthenticated(true)
+      }
+    }
+    setIsLoading(false)
+  }, [])
 
   useEffect(() => {
     // Só carregar dados se estiver autenticado
@@ -83,6 +103,19 @@ export default function Home() {
     }
   }, [isAuthenticated])
 
+  // Mostrar loading enquanto verifica autenticação
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🏸</div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Se não estiver autenticado, mostrar tela de login
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />
@@ -90,10 +123,15 @@ export default function Home() {
 
   const tabs = [
     { id: 'players', name: 'Jogadores', icon: '👤' },
+    { id: 'elimination', name: 'Jogos por eliminação', icon: '🥇' },
+    { id: 'games-possibilities', name: 'Jogos por possibilidades', icon: '🎯' },
+    { id: 'categories', name: 'Cadastro de categorias', icon: '🏆' }
+  ]
+
+  const subTabs = [
     { id: 'games', name: 'Jogos', icon: '🏸' },
-    { id: 'schedule', name: 'Agendamento', icon: '📅' },
+    { id: 'schedule', name: 'Agendamentos', icon: '📅' },
     { id: 'standings', name: 'Classificação', icon: '📊' },
-    { id: 'categories', name: 'Categorias', icon: '🏆' },
     { id: 'settings', name: 'Configurações', icon: '⚙️' }
   ]
 
@@ -158,6 +196,90 @@ export default function Home() {
         </div>
       )}
 
+      {activeTab === 'games-possibilities' && (
+        <div className="space-y-6">
+          {/* Sub Navigation Tabs */}
+          <div className="bg-white p-4 rounded-xl shadow-lg border border-blue-100">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                {subTabs.map((subTab) => (
+                  <button
+                    key={subTab.id}
+                    onClick={() => setActiveSubTab(subTab.id)}
+                    className={`${
+                      activeSubTab === subTab.id
+                        ? 'border-green-500 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
+                  >
+                    <span>{subTab.icon}</span>
+                    {subTab.name}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Sub Tab Content */}
+          {activeSubTab === 'games' && (
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+              <h2 className="text-xl font-semibold mb-4 text-blue-800">Jogos do Campeonato</h2>
+              <GamesList 
+                games={games}
+                players={players}
+                categories={categories}
+                onGamesUpdated={fetchGames}
+              />
+            </div>
+          )}
+
+          {activeSubTab === 'schedule' && (
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+              <h2 className="text-xl font-semibold mb-4 text-blue-800">Agendamento de Jogos</h2>
+              <GameSchedule 
+                games={games}
+                categories={categories}
+                onGamesUpdated={fetchGames}
+              />
+            </div>
+          )}
+
+          {activeSubTab === 'standings' && (
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+              <h2 className="text-xl font-semibold mb-4 text-blue-800">Classificação por Categoria</h2>
+              <Standings 
+                games={games}
+                players={players}
+                categories={categories}
+              />
+            </div>
+          )}
+
+          {activeSubTab === 'settings' && (
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+              <h2 className="text-xl font-semibold mb-4 text-blue-800">Configurações do Sistema</h2>
+              <GamesList 
+                games={games}
+                players={players}
+                categories={categories}
+                onGamesUpdated={fetchGames}
+                settingsMode={true}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'elimination' && (
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
+          <EliminationTournament 
+            players={players}
+            categories={categories}
+            teams={[]}
+          />
+        </div>
+      )}
+
       {activeTab === 'categories' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
@@ -171,53 +293,6 @@ export default function Home() {
               onCategoryUpdated={fetchCategories}
             />
           </div>
-        </div>
-      )}
-
-      {activeTab === 'games' && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Jogos do Campeonato</h2>
-          <GamesList 
-            games={games}
-            players={players}
-            categories={categories}
-            onGamesUpdated={fetchGames}
-          />
-        </div>
-      )}
-
-      {activeTab === 'schedule' && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Agendamento de Jogos</h2>
-          <GameSchedule 
-            games={games}
-            categories={categories}
-            onGamesUpdated={fetchGames}
-          />
-        </div>
-      )}
-
-      {activeTab === 'standings' && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Classificação por Categoria</h2>
-          <Standings 
-            games={games}
-            players={players}
-            categories={categories}
-          />
-        </div>
-      )}
-
-      {activeTab === 'settings' && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 hover:shadow-xl transition-shadow">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Configurações do Sistema</h2>
-          <GamesList 
-            games={games}
-            players={players}
-            categories={categories}
-            onGamesUpdated={fetchGames}
-            settingsMode={true}
-          />
         </div>
       )}
     </div>

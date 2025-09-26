@@ -1,60 +1,25 @@
 declare module 'react' {
-  import React from 'react';
-  export = React;
-  export as namespace React;
+  export function useState<T>(initialState: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void]
+  export function useEffect(effect: EffectCallback, deps?: DependencyList): void
+  export function createElement(type: any, props?: any, ...children: any[]): any
+  export function Component(props: any): any
+  export function Fragment(props: any): any
   
-  export interface Component<P = {}, S = {}, SS = any> extends ComponentLifecycle<P, S, SS> {}
-  export interface ComponentLifecycle<P, S, SS = any> {
-    componentDidMount?(): void;
-    shouldComponentUpdate?(nextProps: Readonly<P>, nextState: Readonly<S>, nextContext: any): boolean;
-    componentWillUnmount?(): void;
-    componentDidCatch?(error: Error, errorInfo: ErrorInfo): void;
-    getSnapshotBeforeUpdate?(prevProps: Readonly<P>, prevState: Readonly<S>): SS | null;
-    componentDidUpdate?(prevProps: Readonly<P>, prevState: Readonly<S>, snapshot?: SS): void;
-    componentWillMount?(): void;
-    UNSAFE_componentWillMount?(): void;
-    componentWillReceiveProps?(nextProps: Readonly<P>, nextContext: any): void;
-    UNSAFE_componentWillReceiveProps?(nextProps: Readonly<P>, nextContext: any): void;
-    componentWillUpdate?(nextProps: Readonly<P>, nextState: Readonly<S>, nextContext: any): void;
-    UNSAFE_componentWillUpdate?(nextProps: Readonly<P>, nextState: Readonly<S>, nextContext: any): void;
+  export type EffectCallback = () => (void | (() => void | undefined))
+  export type DependencyList = ReadonlyArray<any>
+  export type ReactNode = any
+  export type ComponentType<P = {}> = any
+  export type FC<P = {}> = any
+  
+  const React: {
+    useState: typeof useState
+    useEffect: typeof useEffect
+    createElement: typeof createElement
+    Component: typeof Component
+    Fragment: typeof Fragment
   }
   
-  export interface ErrorInfo {
-    componentStack: string;
-  }
-  
-  export interface ReactElement<P = any, T extends string | JSXElementConstructor<any> = string | JSXElementConstructor<any>> {
-    type: T;
-    props: P;
-    key: Key | null;
-  }
-  
-  export type JSXElementConstructor<P> = ((props: P) => ReactElement<any, any> | null) | (new (props: P) => Component<any, any>);
-  export type Key = string | number;
-  export type ReactNode = ReactElement | string | number | ReactFragment | ReactPortal | boolean | null | undefined;
-  export type ReactFragment = {} | Iterable<ReactNode>;
-  export type ReactPortal = any;
-  
-  export interface Attributes {
-    key?: Key | null | undefined;
-  }
-  
-  export interface ClassAttributes<T> extends Attributes {
-    ref?: LegacyRef<T> | undefined;
-  }
-  
-  export type LegacyRef<T> = string | Ref<T>;
-  export type Ref<T> = RefCallback<T> | RefObject<T> | null;
-  export type RefCallback<T> = (instance: T | null) => void;
-  export interface RefObject<T> {
-    readonly current: T | null;
-  }
-  
-  export function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];
-  export function useState<S = undefined>(): [S | undefined, Dispatch<SetStateAction<S | undefined>>];
-  
-  export type Dispatch<A> = (value: A) => void;
-  export type SetStateAction<S> = S | ((prevState: S) => S);
+  export default React
   
   export interface FormEvent<T = Element> extends SyntheticEvent<T> {
     currentTarget: EventTarget & T;
